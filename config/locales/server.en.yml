@@ -1,6 +1,11 @@
 en:
   site_settings:
-    messaging_preferences_enabled: "Enable Messaging Preferences. Members can save private messaging preferences and the plugin exposes the secured API used by the frontend component."
+    messaging_preferences_enabled: "Enable Messaging Preferences across the site. Disabling this hides the member fields and all Personal Message and direct Chat prompts."
+    messaging_preferences_personal_messages_enabled: "Show Messaging Preferences in one-to-one Personal Messages. Group Personal Messages are never included."
+    messaging_preferences_direct_chat_enabled: "Show Messaging Preferences in one-to-one direct Chat conversations. Group chats and channels are never included."
+    messaging_preferences_require_acknowledgement: "Require members to acknowledge the current preferences before they can send. When disabled, preferences remain informational and do not block sending."
+    messaging_preferences_show_reminder_after_acknowledgement: "Keep a compact View reminder visible after the current preferences have been acknowledged."
+    messaging_preferences_staff_bypass_acknowledgement: "Allow staff to view Messaging Preferences without being required to acknowledge them before sending."
 
   messaging_preferences:
     errors:

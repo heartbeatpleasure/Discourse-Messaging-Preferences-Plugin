@@ -7,6 +7,8 @@ RSpec.describe "Messaging Preferences API", type: :request do
 
   before do
     SiteSetting.messaging_preferences_enabled = true
+    SiteSetting.messaging_preferences_require_acknowledgement = true
+    SiteSetting.messaging_preferences_staff_bypass_acknowledgement = true
     UserCustomField.create!(
       user_id: target.id,
       name: MessagingPreferences::WORKS_WELL_FIELD,
@@ -148,6 +150,30 @@ RSpec.describe "Messaging Preferences API", type: :request do
     expect(
       response.parsed_body.dig("messaging_preferences", "acknowledgement_required"),
     ).to eq(false)
+  end
+
+  it "can expose preferences without requiring acknowledgement" do
+    SiteSetting.messaging_preferences_require_acknowledgement = false
+
+    get "/messaging-preferences/v1/users/#{target.username}"
+
+    expect(response.status).to eq(200)
+    preferences = response.parsed_body.fetch("messaging_preferences")
+    expect(preferences["has_preferences"]).to eq(true)
+    expect(preferences["acknowledgement_required"]).to eq(false)
+    expect(preferences["acknowledged"]).to eq(false)
+  end
+
+  it "can require staff to acknowledge when the bypass setting is disabled" do
+    SiteSetting.messaging_preferences_staff_bypass_acknowledgement = false
+    sign_in(admin)
+
+    get "/messaging-preferences/v1/users/#{target.username}"
+
+    expect(response.status).to eq(200)
+    preferences = response.parsed_body.fetch("messaging_preferences")
+    expect(preferences["can_bypass_acknowledgement"]).to eq(false)
+    expect(preferences["acknowledgement_required"]).to eq(true)
   end
 
   it "returns not found while the plugin setting is disabled" do

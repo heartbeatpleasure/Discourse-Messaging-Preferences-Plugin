@@ -2,7 +2,7 @@
 
 # name: Discourse-Messaging-Preferences-Plugin
 # about: Lets members define private messaging preferences for personal messages and direct chats.
-# version: 0.2.0
+# version: 0.3.0
 # authors: Chris
 # url: https://github.com/xxxxxx/Discourse-Messaging-Preferences-Plugin
 

@@ -53,8 +53,10 @@ module ::MessagingPreferences
     def payload_for(viewer)
       acknowledgement = acknowledgement_for(viewer)
       acknowledged = acknowledgement.present?
-      staff_bypass = viewer&.staff? || false
+      staff_bypass =
+        viewer&.staff? && SiteSetting.messaging_preferences_staff_bypass_acknowledgement
       own_preferences = viewer&.id == target_user.id
+      acknowledgement_enabled = SiteSetting.messaging_preferences_require_acknowledgement
 
       {
         username: target_user.username,
@@ -66,8 +68,9 @@ module ::MessagingPreferences
         acknowledged: acknowledged,
         acknowledged_at: acknowledgement&.acknowledged_at&.iso8601(6),
         acknowledgement_required:
-          present? && !own_preferences && !staff_bypass && !acknowledged,
-        can_bypass_acknowledgement: staff_bypass,
+          present? && acknowledgement_enabled && !own_preferences && !staff_bypass &&
+            !acknowledged,
+        can_bypass_acknowledgement: !!staff_bypass,
       }
     end
 

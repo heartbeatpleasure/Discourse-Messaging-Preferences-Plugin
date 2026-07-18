@@ -2,3 +2,17 @@ plugins:
   messaging_preferences_enabled:
     default: true
     client: true
+  messaging_preferences_personal_messages_enabled:
+    default: true
+    client: true
+  messaging_preferences_direct_chat_enabled:
+    default: true
+    client: true
+  messaging_preferences_require_acknowledgement:
+    default: true
+    client: true
+  messaging_preferences_show_reminder_after_acknowledgement:
+    default: true
+    client: true
+  messaging_preferences_staff_bypass_acknowledgement:
+    default: true
