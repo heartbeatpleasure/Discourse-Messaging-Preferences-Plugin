@@ -6,7 +6,8 @@ module ::MessagingPreferences
 
     class << self
       def install!
-        require_dependency "jobs/regular/export_user_archive"
+        export_job_path = Rails.root.join("app/jobs/regular/export_user_archive.rb")
+        require_dependency export_job_path.to_s
 
         components = ::Jobs::ExportUserArchive::COMPONENTS
         components << COMPONENT_NAME if !components.include?(COMPONENT_NAME)
