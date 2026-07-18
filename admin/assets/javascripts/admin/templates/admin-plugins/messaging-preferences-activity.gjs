@@ -1085,94 +1085,6 @@ export default RouteTemplate(
           {{/if}}
         </section>
 
-        <section class="mp-activity__panel mp-activity__panel--danger">
-          <div class="mp-activity__panel-copy">
-            <h2>{{i18n "admin.messaging_preferences.activity.maintenance.title"}}</h2>
-            <p class="mp-activity__muted">
-              {{i18n "admin.messaging_preferences.activity.maintenance.description"}}
-            </p>
-          </div>
-
-          <div class="mp-activity__scope-warning">
-            <strong>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning_title"}}</strong>
-            <span>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning"}}</span>
-          </div>
-
-          <div class="mp-activity__maintenance-grid">
-            <article class="mp-activity__maintenance-card is-sitewide">
-              <div class="mp-activity__maintenance-heading">
-                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.integrity_title"}}</h3>
-                <span class="mp-activity__scope-badge">
-                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
-                </span>
-              </div>
-              <p class="mp-activity__muted">
-                {{i18n "admin.messaging_preferences.activity.maintenance.integrity_scope_detail"}}
-              </p>
-              <div class="mp-activity__maintenance-copy">
-                <span>{{@controller.retentionLabel}}</span>
-                <span>{{@controller.retainedEventsLabel}}</span>
-                <span>{{@controller.expiredEventsLabel}}</span>
-                <span>{{@controller.integrityLabel}}</span>
-              </div>
-              <div class="mp-activity__maintenance-actions">
-                <button
-                  type="button"
-                  class="btn"
-                  disabled={{@controller.isMaintaining}}
-                  {{on "click" @controller.runCleanup}}
-                >
-                  {{i18n "admin.messaging_preferences.activity.maintenance.run_cleanup"}}
-                </button>
-              </div>
-            </article>
-
-            <article class="mp-activity__maintenance-card is-sitewide">
-              <div class="mp-activity__maintenance-heading">
-                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.acknowledgements_title"}}</h3>
-                <span class="mp-activity__scope-badge">
-                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
-                </span>
-              </div>
-              <p class="mp-activity__muted">
-                {{@controller.allAcknowledgementsLabel}}
-              </p>
-              <div class="mp-activity__maintenance-actions">
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  disabled={{@controller.isMaintaining}}
-                  {{on "click" @controller.resetAllAcknowledgements}}
-                >
-                  {{i18n "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements"}}
-                </button>
-              </div>
-            </article>
-
-            <article class="mp-activity__maintenance-card is-sitewide">
-              <div class="mp-activity__maintenance-heading">
-                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.history_title"}}</h3>
-                <span class="mp-activity__scope-badge">
-                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
-                </span>
-              </div>
-              <p class="mp-activity__muted">
-                {{@controller.allHistoryLabel}}
-              </p>
-              <div class="mp-activity__maintenance-actions">
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  disabled={{@controller.isMaintaining}}
-                  {{on "click" @controller.clearActivityHistory}}
-                >
-                  {{i18n "admin.messaging_preferences.activity.maintenance.clear_history"}}
-                </button>
-              </div>
-            </article>
-          </div>
-        </section>
-
         <section class="mp-activity__panel">
           <div class="mp-activity__panel-copy">
             <h2>{{i18n "admin.messaging_preferences.activity.recent_title"}}</h2>
@@ -1268,6 +1180,95 @@ export default RouteTemplate(
             </button>
           </div>
         </section>
+
+        <section class="mp-activity__panel mp-activity__panel--danger">
+          <div class="mp-activity__panel-copy">
+            <h2>{{i18n "admin.messaging_preferences.activity.maintenance.title"}}</h2>
+            <p class="mp-activity__muted">
+              {{i18n "admin.messaging_preferences.activity.maintenance.description"}}
+            </p>
+          </div>
+
+          <div class="mp-activity__scope-warning">
+            <strong>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning_title"}}</strong>
+            <span>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning"}}</span>
+          </div>
+
+          <div class="mp-activity__maintenance-grid">
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.integrity_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
+              </div>
+              <p class="mp-activity__muted">
+                {{i18n "admin.messaging_preferences.activity.maintenance.integrity_scope_detail"}}
+              </p>
+              <div class="mp-activity__maintenance-copy">
+                <span>{{@controller.retentionLabel}}</span>
+                <span>{{@controller.retainedEventsLabel}}</span>
+                <span>{{@controller.expiredEventsLabel}}</span>
+                <span>{{@controller.integrityLabel}}</span>
+              </div>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.runCleanup}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.maintenance.run_cleanup"}}
+                </button>
+              </div>
+            </article>
+
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.acknowledgements_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
+              </div>
+              <p class="mp-activity__muted">
+                {{@controller.allAcknowledgementsLabel}}
+              </p>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.resetAllAcknowledgements}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements"}}
+                </button>
+              </div>
+            </article>
+
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.history_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
+              </div>
+              <p class="mp-activity__muted">
+                {{@controller.allHistoryLabel}}
+              </p>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.clearActivityHistory}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.maintenance.clear_history"}}
+                </button>
+              </div>
+            </article>
+          </div>
+        </section>
+
       {{/if}}
     </div>
   </template>
