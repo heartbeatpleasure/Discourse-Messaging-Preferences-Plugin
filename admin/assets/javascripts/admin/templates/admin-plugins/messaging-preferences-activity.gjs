@@ -41,6 +41,11 @@ export default RouteTemplate(
         box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
       }
 
+      .mp-activity__panel--danger {
+        border: 2px solid var(--danger-low-mid);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 3%), 0 0 0 3px rgb(220 38 38 / 4%);
+      }
+
       .mp-activity__header,
       .mp-activity__panel-header,
       .mp-activity__user-header {
@@ -287,30 +292,40 @@ export default RouteTemplate(
 
       .mp-activity__maintenance-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: 1fr;
         gap: 1rem;
         margin-top: 1rem;
       }
 
       .mp-activity__maintenance-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "heading actions"
+          "description actions"
+          "copy actions";
+        align-items: start;
+        column-gap: 1rem;
+        row-gap: 0.65rem;
         min-width: 0;
-        padding: 1rem;
+        padding: 1rem 1.1rem;
         border: 1px solid var(--mp-border);
         border-radius: 16px;
         background: var(--mp-surface-alt);
       }
 
       .mp-activity__maintenance-card.is-sitewide {
-        border-color: var(--highlight-medium);
-        background: var(--highlight-low);
+        border-color: var(--danger-low-mid);
+        background: var(--secondary);
       }
 
       .mp-activity__maintenance-heading {
         display: flex;
+        grid-area: heading;
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        margin-bottom: 0.45rem;
+        margin-bottom: 0;
       }
 
       .mp-activity__maintenance-heading h3 {
@@ -322,10 +337,10 @@ export default RouteTemplate(
         flex: 0 0 auto;
         align-items: center;
         padding: 0.2rem 0.5rem;
-        border: 1px solid var(--highlight-medium);
+        border: 1px solid var(--danger-low-mid);
         border-radius: 999px;
-        background: var(--highlight-low);
-        color: var(--primary-high);
+        background: var(--secondary);
+        color: var(--danger);
         font-size: var(--font-down-2);
         font-weight: 700;
       }
@@ -338,21 +353,35 @@ export default RouteTemplate(
 
       .mp-activity__scope-warning {
         display: grid;
-        gap: 0.25rem;
+        gap: 0.3rem;
         margin-top: 1rem;
-        border: 1px solid var(--highlight-medium);
-        background: var(--highlight-low);
+        padding: 0.95rem 1rem;
+        border: 1px solid var(--danger-low-mid);
+        border-radius: 14px;
+        background: var(--secondary);
         color: var(--primary-high);
       }
 
+      .mp-activity__scope-warning strong {
+        color: var(--danger);
+      }
+
+      .mp-activity__maintenance-card > .mp-activity__muted {
+        grid-area: description;
+      }
+
       .mp-activity__maintenance-copy {
+        grid-area: copy;
         display: grid;
         gap: 0.35rem;
         color: var(--mp-muted);
       }
 
       .mp-activity__maintenance-actions {
-        margin-top: 0.9rem;
+        grid-area: actions;
+        align-self: center;
+        justify-content: flex-end;
+        margin-top: 0;
       }
 
       .mp-activity__table-wrap {
@@ -488,6 +517,21 @@ export default RouteTemplate(
         }
       }
 
+      @media (max-width: 900px) {
+        .mp-activity__maintenance-card {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "heading"
+            "description"
+            "copy"
+            "actions";
+        }
+
+        .mp-activity__maintenance-actions {
+          justify-content: flex-start;
+        }
+      }
+
       @media (max-width: 800px) {
         .mp-activity__header,
         .mp-activity__panel-header,
@@ -504,8 +548,7 @@ export default RouteTemplate(
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .mp-activity__columns,
-        .mp-activity__maintenance-grid {
+        .mp-activity__columns {
           grid-template-columns: 1fr;
         }
       }
@@ -983,7 +1026,7 @@ export default RouteTemplate(
           {{/if}}
         </section>
 
-        <section class="mp-activity__panel">
+        <section class="mp-activity__panel mp-activity__panel--danger">
           <div class="mp-activity__panel-copy">
             <h2>{{i18n "admin.messaging_preferences.activity.maintenance.title"}}</h2>
             <p class="mp-activity__muted">
