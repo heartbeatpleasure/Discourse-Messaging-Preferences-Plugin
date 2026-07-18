@@ -64,6 +64,59 @@ RSpec.describe MessagingPreferences::AdminActivity do
     expect(payload.dig(:trend, :metrics, :acknowledgements, :current)).to eq(1)
   end
 
+  it "uses the event-type filter only for histories and keeps trends complete" do
+    admin = Fabricate(:admin)
+    MessagingPreferences::Event.create!(
+      event_type: "preferences_updated",
+      actor: owner,
+      target: owner,
+      occurred_at: 1.hour.ago,
+    )
+    MessagingPreferences::Event.create!(
+      event_type: "admin_site_cleanup",
+      actor: admin,
+      target: admin,
+      occurred_at: Time.zone.now,
+    )
+
+    payload = described_class.payload(period: "7", event_filter: "admin_actions")
+
+    expect(payload.dig(:recent_events, :pagination, :total)).to eq(1)
+    expect(payload.dig(:recent_events, :items, 0, :event_type)).to eq(
+      "admin_site_cleanup",
+    )
+    expect(payload.dig(:trend, :metrics, :preference_changes, :current)).to eq(1)
+    expect(payload.dig(:trend, :metrics, :acknowledgements, :current)).to eq(1)
+    expect(payload.dig(:trend, :metrics, :total_events, :current)).to eq(2)
+  end
+
+  it "includes site-wide and member-specific admin actions in member history" do
+    admin = Fabricate(:admin)
+    MessagingPreferences::Event.create!(
+      event_type: "admin_site_cleanup",
+      actor: admin,
+      target: admin,
+      occurred_at: 2.minutes.ago,
+    )
+    MessagingPreferences::Event.create!(
+      event_type: "admin_reset_member_acks",
+      actor: admin,
+      target: owner,
+      occurred_at: 1.minute.ago,
+    )
+
+    selected =
+      described_class.payload(
+        user_id: owner.id,
+        period: "all",
+        event_filter: "admin_actions",
+      ).fetch(:selected_user)
+
+    expect(selected.dig(:events, :items).map { |event| event[:event_type] }).to eq(
+      ["admin_reset_member_acks", "admin_site_cleanup"],
+    )
+  end
+
   it "paginates global and member activity independently" do
     30.times do |index|
       MessagingPreferences::Event.create!(

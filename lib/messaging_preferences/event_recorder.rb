@@ -35,6 +35,38 @@ module ::MessagingPreferences
       )
     end
 
+    def self.record_admin_sitewide_cleanup!(actor:)
+      return false if !::MessagingPreferences::Event.table_ready?
+
+      create_event(
+        event_type: "admin_site_cleanup",
+        actor_user_id: actor.id,
+        target_user_id: actor.id,
+      )
+    end
+
+    def self.record_admin_reset_all_acknowledgements!(actor:, removed_count:)
+      return false if removed_count.to_i <= 0
+      return false if !::MessagingPreferences::Event.table_ready?
+
+      create_event(
+        event_type: "admin_reset_all_acks",
+        actor_user_id: actor.id,
+        target_user_id: actor.id,
+      )
+    end
+
+    def self.record_admin_reset_member_acknowledgements!(actor:, target:, removed_count:)
+      return false if removed_count.to_i <= 0
+      return false if !::MessagingPreferences::Event.table_ready?
+
+      create_event(
+        event_type: "admin_reset_member_acks",
+        actor_user_id: actor.id,
+        target_user_id: target.id,
+      )
+    end
+
     def self.record_acknowledgement!(viewer:, target:, digest:, already_current:)
       return false if already_current
       return false if !::MessagingPreferences::Event.table_ready?

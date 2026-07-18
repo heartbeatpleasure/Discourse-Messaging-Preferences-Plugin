@@ -95,4 +95,55 @@ RSpec.describe MessagingPreferences::EventRecorder do
     expect(event.attributes.values).not_to include("Private text")
   end
 
+  it "records privacy-safe admin maintenance events" do
+    admin = Fabricate(:admin)
+
+    expect(described_class.record_admin_sitewide_cleanup!(actor: admin)).to eq(true)
+    expect(
+      described_class.record_admin_reset_all_acknowledgements!(
+        actor: admin,
+        removed_count: 3,
+      ),
+    ).to eq(true)
+    expect(
+      described_class.record_admin_reset_member_acknowledgements!(
+        actor: admin,
+        target: user,
+        removed_count: 2,
+      ),
+    ).to eq(true)
+
+    expect(
+      MessagingPreferences::Event.order(:id).pluck(
+        :event_type,
+        :actor_user_id,
+        :target_user_id,
+      ),
+    ).to eq(
+      [
+        ["admin_site_cleanup", admin.id, admin.id],
+        ["admin_reset_all_acks", admin.id, admin.id],
+        ["admin_reset_member_acks", admin.id, user.id],
+      ],
+    )
+  end
+
+  it "does not record acknowledgement resets that removed no relationships" do
+    admin = Fabricate(:admin)
+
+    expect(
+      described_class.record_admin_reset_all_acknowledgements!(
+        actor: admin,
+        removed_count: 0,
+      ),
+    ).to eq(false)
+    expect(
+      described_class.record_admin_reset_member_acknowledgements!(
+        actor: admin,
+        target: user,
+        removed_count: 0,
+      ),
+    ).to eq(false)
+    expect(MessagingPreferences::Event.count).to eq(0)
+  end
 end

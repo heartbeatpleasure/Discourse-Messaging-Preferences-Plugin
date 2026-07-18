@@ -17,6 +17,19 @@ RSpec.describe MessagingPreferences::Event do
     expect(event.attributes).not_to have_key("preference_text")
   end
 
+  it "accepts the supported admin activity event types" do
+    MessagingPreferences::Event::ADMIN_EVENT_TYPES.each do |event_type|
+      event = described_class.new(
+        event_type: event_type,
+        actor: actor,
+        target: target,
+        occurred_at: Time.zone.now,
+      )
+
+      expect(event).to be_valid
+    end
+  end
+
   it "rejects unknown event types" do
     event = described_class.new(
       event_type: "unknown",

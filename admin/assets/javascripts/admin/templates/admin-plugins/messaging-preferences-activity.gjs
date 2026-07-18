@@ -164,6 +164,26 @@ export default RouteTemplate(
         width: 100%;
       }
 
+      .mp-activity__history-filter {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 1.1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--mp-border);
+      }
+
+      .mp-activity__history-filter-copy {
+        display: grid;
+        min-width: 0;
+        gap: 0.25rem;
+      }
+
+      .mp-activity__history-filter .mp-activity__filter {
+        flex: 0 0 min(18rem, 100%);
+      }
+
       .mp-activity__search {
         position: relative;
         width: min(34rem, 100%);
@@ -323,8 +343,8 @@ export default RouteTemplate(
         display: flex;
         grid-area: heading;
         align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
+        justify-content: flex-start;
+        gap: 0.55rem;
         margin-bottom: 0;
       }
 
@@ -543,6 +563,16 @@ export default RouteTemplate(
           justify-content: flex-start;
         }
 
+        .mp-activity__history-filter {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .mp-activity__history-filter .mp-activity__filter {
+          flex-basis: auto;
+          width: 100%;
+        }
+
         .mp-activity__summary-grid,
         .mp-activity__user-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -674,6 +704,25 @@ export default RouteTemplate(
                 {{/each}}
               </DSelect>
             </div>
+          </div>
+
+          <div class="mp-activity__trend-grid">
+            {{#each @controller.trendCards as |card|}}
+              <article class="mp-activity__trend-card">
+                <div class="mp-activity__card-label">{{card.label}}</div>
+                <div class="mp-activity__card-value">{{card.value}}</div>
+                <div class="mp-activity__card-detail">{{card.detail}}</div>
+              </article>
+            {{/each}}
+          </div>
+
+          <div class="mp-activity__history-filter">
+            <div class="mp-activity__history-filter-copy">
+              <h3>{{i18n "admin.messaging_preferences.activity.filters.history_title"}}</h3>
+              <p class="mp-activity__muted">
+                {{i18n "admin.messaging_preferences.activity.filters.history_description"}}
+              </p>
+            </div>
 
             <div class="mp-activity__filter">
               <label for="mp-activity-event-filter">
@@ -694,16 +743,6 @@ export default RouteTemplate(
                 {{/each}}
               </DSelect>
             </div>
-          </div>
-
-          <div class="mp-activity__trend-grid">
-            {{#each @controller.trendCards as |card|}}
-              <article class="mp-activity__trend-card">
-                <div class="mp-activity__card-label">{{card.label}}</div>
-                <div class="mp-activity__card-value">{{card.value}}</div>
-                <div class="mp-activity__card-detail">{{card.detail}}</div>
-              </article>
-            {{/each}}
           </div>
         </section>
 
@@ -961,7 +1000,27 @@ export default RouteTemplate(
                   {{#each @controller.selectedUserEvents as |event|}}
                     <article class="mp-activity__event">
                       <div class="mp-activity__event-copy">
-                        {{#if (eq event.event_type "acknowledged")}}
+                        {{#if (eq event.event_type "admin_site_cleanup")}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{i18n "admin.messaging_preferences.activity.events.admin_site_cleanup_action"}}
+                        {{else if (eq event.event_type "admin_reset_all_acks")}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{i18n "admin.messaging_preferences.activity.events.admin_reset_all_acknowledgements_action"}}
+                        {{else if (eq event.event_type "admin_reset_member_acks")}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{i18n "admin.messaging_preferences.activity.events.admin_reset_member_acknowledgements_action"}}
+                          <MessagingPreferencesUserLink @user={{event.target}}>
+                            {{event.targetDisplay}}
+                          </MessagingPreferencesUserLink>{{i18n
+                            "admin.messaging_preferences.activity.events.admin_reset_member_acknowledgements_suffix"
+                          }}
+                        {{else if (eq event.event_type "acknowledged")}}
                           <MessagingPreferencesUserLink @user={{event.actor}}>
                             {{event.actorDisplay}}
                           </MessagingPreferencesUserLink>
@@ -1127,7 +1186,27 @@ export default RouteTemplate(
               {{#each @controller.recentEvents as |event|}}
                 <article class="mp-activity__event">
                   <div class="mp-activity__event-copy">
-                    {{#if (eq event.event_type "acknowledged")}}
+                    {{#if (eq event.event_type "admin_site_cleanup")}}
+                      <MessagingPreferencesUserLink @user={{event.actor}}>
+                        {{event.actorDisplay}}
+                      </MessagingPreferencesUserLink>
+                      {{i18n "admin.messaging_preferences.activity.events.admin_site_cleanup_action"}}
+                    {{else if (eq event.event_type "admin_reset_all_acks")}}
+                      <MessagingPreferencesUserLink @user={{event.actor}}>
+                        {{event.actorDisplay}}
+                      </MessagingPreferencesUserLink>
+                      {{i18n "admin.messaging_preferences.activity.events.admin_reset_all_acknowledgements_action"}}
+                    {{else if (eq event.event_type "admin_reset_member_acks")}}
+                      <MessagingPreferencesUserLink @user={{event.actor}}>
+                        {{event.actorDisplay}}
+                      </MessagingPreferencesUserLink>
+                      {{i18n "admin.messaging_preferences.activity.events.admin_reset_member_acknowledgements_action"}}
+                      <MessagingPreferencesUserLink @user={{event.target}}>
+                        {{event.targetDisplay}}
+                      </MessagingPreferencesUserLink>{{i18n
+                        "admin.messaging_preferences.activity.events.admin_reset_member_acknowledgements_suffix"
+                      }}
+                    {{else if (eq event.event_type "acknowledged")}}
                       <MessagingPreferencesUserLink @user={{event.actor}}>
                         {{event.actorDisplay}}
                       </MessagingPreferencesUserLink>

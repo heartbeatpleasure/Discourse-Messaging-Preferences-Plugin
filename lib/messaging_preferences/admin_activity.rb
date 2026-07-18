@@ -12,6 +12,7 @@ module ::MessagingPreferences
       "all" => ::MessagingPreferences::Event::EVENT_TYPES,
       "preference_changes" => ::MessagingPreferences::Event::PREFERENCE_EVENT_TYPES,
       "acknowledgements" => [::MessagingPreferences::Event::ACKNOWLEDGEMENT_EVENT_TYPE],
+      "admin_actions" => ::MessagingPreferences::Event::ADMIN_EVENT_TYPES,
     }.freeze
     DEFAULT_PERIOD = "30"
     DEFAULT_EVENT_FILTER = "all"
@@ -204,7 +205,10 @@ module ::MessagingPreferences
       end
 
       def trend_payload(period)
-        current_scope = base_event_scope
+        current_scope =
+          base_event_scope.where(
+            event_type: ::MessagingPreferences::Event::MEMBER_ACTIVITY_EVENT_TYPES,
+          )
         days = PERIODS.fetch(period)
         start_at = period_start(period)
         previous = nil
@@ -217,11 +221,15 @@ module ::MessagingPreferences
           previous_end = start_at
           previous_start = previous_end - days.days
           previous_scope =
-            base_event_scope.where(
-              "occurred_at >= ? AND occurred_at < ?",
-              previous_start,
-              previous_end,
-            )
+            base_event_scope
+              .where(
+                event_type: ::MessagingPreferences::Event::MEMBER_ACTIVITY_EVENT_TYPES,
+              )
+              .where(
+                "occurred_at >= ? AND occurred_at < ?",
+                previous_start,
+                previous_end,
+              )
           previous = trend_counts(previous_scope)
         end
 
@@ -318,14 +326,18 @@ module ::MessagingPreferences
         state = states[user.id] || empty_state
         received = received_acknowledgements(user, states)
         made = made_acknowledgements(user, states)
-        events =
-          paginated_events(
-            filtered_scope.where(
+        member_event_scope =
+          filtered_scope
+            .where(
               "actor_user_id = :id OR target_user_id = :id",
               id: user.id,
-            ),
-            page,
-          )
+            )
+            .or(
+              filtered_scope.where(
+                event_type: ::MessagingPreferences::Event::SITEWIDE_ADMIN_EVENT_TYPES,
+              ),
+            )
+        events = paginated_events(member_event_scope, page)
 
         event_counts = user_event_counts(user)
         relationship_counts = current_relationship_counts(user, states)

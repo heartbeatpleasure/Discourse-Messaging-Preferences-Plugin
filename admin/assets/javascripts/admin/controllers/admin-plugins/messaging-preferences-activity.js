@@ -139,6 +139,12 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
           "admin.messaging_preferences.activity.filters.type_acknowledgements"
         ),
       },
+      {
+        value: "admin_actions",
+        label: i18n(
+          "admin.messaging_preferences.activity.filters.type_admin_actions"
+        ),
+      },
     ];
   }
 

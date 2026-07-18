@@ -109,7 +109,15 @@ RSpec.describe "Messaging Preferences admin maintenance", type: :request do
 
     expect(response.status).to eq(200)
     expect(response.parsed_body["removed_acknowledgements"]).to eq(1)
+    expect(response.parsed_body["recorded_event"]).to eq(true)
     expect(MessagingPreferences::Acknowledgement.count).to eq(0)
+    expect(
+      MessagingPreferences::Event.exists?(
+        event_type: "admin_reset_member_acks",
+        actor_user_id: admin.id,
+        target_user_id: member.id,
+      ),
+    ).to eq(true)
   end
 
   it "lets an admin clear one member's preferences without exposing their text" do
@@ -123,6 +131,39 @@ RSpec.describe "Messaging Preferences admin maintenance", type: :request do
     expect(
       UserCustomField.where(user_id: member.id, name: MessagingPreferences::FIELD_NAMES),
     ).to be_empty
+  end
+
+  it "records a site-wide acknowledgement reset when relationships were removed" do
+    sign_in(admin)
+
+    delete "/admin/plugins/messaging-preferences/activity/acknowledgements.json"
+
+    expect(response.status).to eq(200)
+    expect(response.parsed_body["removed_acknowledgements"]).to eq(1)
+    expect(response.parsed_body["recorded_event"]).to eq(true)
+    expect(
+      MessagingPreferences::Event.exists?(
+        event_type: "admin_reset_all_acks",
+        actor_user_id: admin.id,
+        target_user_id: admin.id,
+      ),
+    ).to eq(true)
+  end
+
+  it "records a manually triggered site-wide cleanup" do
+    sign_in(admin)
+
+    post "/admin/plugins/messaging-preferences/activity/maintenance.json"
+
+    expect(response.status).to eq(200)
+    expect(response.parsed_body["recorded_event"]).to eq(true)
+    expect(
+      MessagingPreferences::Event.exists?(
+        event_type: "admin_site_cleanup",
+        actor_user_id: admin.id,
+        target_user_id: admin.id,
+      ),
+    ).to eq(true)
   end
 
   it "lets an admin clear recorded activity without removing current relationships" do

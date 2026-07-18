@@ -24,8 +24,18 @@ module ::MessagingPreferences
       rate_limit_admin_action!
       user = find_active_user!
       removed = ::MessagingPreferences::DataMaintenance.reset_acknowledgements_for_user!(user)
+      recorded_event =
+        ::MessagingPreferences::EventRecorder.record_admin_reset_member_acknowledgements!(
+          actor: current_user,
+          target: user,
+          removed_count: removed,
+        )
 
-      render_json_dump(success: true, removed_acknowledgements: removed)
+      render_json_dump(
+        success: true,
+        removed_acknowledgements: removed,
+        recorded_event: recorded_event,
+      )
     end
 
     def clear_user_preferences
@@ -43,8 +53,17 @@ module ::MessagingPreferences
     def reset_all_acknowledgements
       rate_limit_admin_action!
       removed = ::MessagingPreferences::DataMaintenance.reset_all_acknowledgements!
+      recorded_event =
+        ::MessagingPreferences::EventRecorder.record_admin_reset_all_acknowledgements!(
+          actor: current_user,
+          removed_count: removed,
+        )
 
-      render_json_dump(success: true, removed_acknowledgements: removed)
+      render_json_dump(
+        success: true,
+        removed_acknowledgements: removed,
+        recorded_event: recorded_event,
+      )
     end
 
     def clear_activity_history
@@ -57,8 +76,12 @@ module ::MessagingPreferences
     def run_maintenance
       rate_limit_admin_action!
       result = ::MessagingPreferences::DataMaintenance.cleanup!
+      recorded_event =
+        ::MessagingPreferences::EventRecorder.record_admin_sitewide_cleanup!(
+          actor: current_user,
+        )
 
-      render_json_dump(success: true, removed: result)
+      render_json_dump(success: true, removed: result, recorded_event: recorded_event)
     end
 
     private
