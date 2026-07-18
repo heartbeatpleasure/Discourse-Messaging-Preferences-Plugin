@@ -3,7 +3,10 @@ import { action } from "@ember/object";
 import { tracked } from "@glimmer/tracking";
 import { ajax } from "discourse/lib/ajax";
 import getURL from "discourse/lib/get-url";
+import userSearch from "discourse/lib/user-search";
 import { i18n } from "discourse-i18n";
+
+const SEARCH_LIMIT = 10;
 
 function formatNumber(value) {
   const number = Number(value || 0);
@@ -36,6 +39,23 @@ function statusClass(current) {
   return current ? "is-current" : "is-outdated";
 }
 
+function avatarUrl(user, size = 40) {
+  return String(user?.avatar_template || "").replace("{size}", String(size));
+}
+
+function decorateSearchUser(user) {
+  if (!user?.id || !user?.username) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatarUrl: avatarUrl(user),
+  };
+}
+
 export default class AdminPluginsMessagingPreferencesActivityController extends Controller {
   @tracked data;
   @tracked isLoading = false;
@@ -43,8 +63,8 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
   @tracked query = "";
   @tracked searchResults = [];
   @tracked isSearching = false;
+  @tracked searchActiveIndex = -1;
 
-  searchTimer = null;
   searchSequence = 0;
 
   get hasData() {
@@ -117,7 +137,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
         ),
         value: formatNumber(this.summary.tracked_preference_changes),
         detail: i18n(
-          "admin.messaging_preferences.activity.cards.tracked_since_update"
+          "admin.messaging_preferences.activity.cards.preference_changes_detail"
         ),
       },
       {
@@ -126,7 +146,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
         ),
         value: formatNumber(this.summary.tracked_acknowledgements),
         detail: i18n(
-          "admin.messaging_preferences.activity.cards.tracked_since_update"
+          "admin.messaging_preferences.activity.cards.got_it_confirmations_detail"
         ),
       },
     ];
@@ -134,12 +154,6 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
 
   get generatedAtLabel() {
     return formatDateTime(this.data?.generated_at);
-  }
-
-  get trackingStartedLabel() {
-    return this.data?.tracking_started_at
-      ? formatDateTime(this.data.tracking_started_at)
-      : i18n("admin.messaging_preferences.activity.tracking_not_started");
   }
 
   get recentEvents() {
@@ -199,7 +213,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
         ),
         value: formatNumber(selected.counts?.tracked_preference_changes),
         detail: i18n(
-          "admin.messaging_preferences.activity.cards.tracked_since_update"
+          "admin.messaging_preferences.activity.user.cards.changes_detail"
         ),
       },
       {
@@ -255,17 +269,57 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     }));
   }
 
-  decorateEvent(event) {
-    const actor = event.actor?.username || i18n("admin.messaging_preferences.activity.unknown_user");
-    const target = event.target?.username || i18n("admin.messaging_preferences.activity.unknown_user");
+  get searchExpanded() {
+    return this.searchResults.length > 0;
+  }
 
+  get searchListboxId() {
+    return "messaging-preferences-member-search-results";
+  }
+
+  get searchActiveDescendant() {
+    return this.searchActiveIndex >= 0
+      ? `messaging-preferences-member-search-option-${this.searchActiveIndex}`
+      : undefined;
+  }
+
+  get showNoSearchResults() {
+    return (
+      this.query.trim().length >= 2 &&
+      !this.isSearching &&
+      this.searchResults.length === 0
+    );
+  }
+
+  get searchStatusMessage() {
+    if (this.isSearching) {
+      return i18n("admin.messaging_preferences.activity.user.searching");
+    }
+
+    if (this.searchResults.length > 0) {
+      return i18n(
+        "admin.messaging_preferences.activity.user.results_available",
+        { count: this.searchResults.length }
+      );
+    }
+
+    if (this.showNoSearchResults) {
+      return i18n("admin.messaging_preferences.activity.user.no_results");
+    }
+
+    return "";
+  }
+
+  decorateEvent(event) {
     return {
       ...event,
+      actorDisplay:
+        event.actor?.username ||
+        i18n("admin.messaging_preferences.activity.unknown_user"),
+      targetDisplay:
+        event.target?.username ||
+        i18n("admin.messaging_preferences.activity.unknown_user"),
       dateLabel: formatDateTime(event.occurred_at),
-      label: i18n(
-        `admin.messaging_preferences.activity.events.${event.event_type}`,
-        { actor, target }
-      ),
     };
   }
 
@@ -276,12 +330,8 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.query = "";
     this.searchResults = [];
     this.isSearching = false;
+    this.searchActiveIndex = -1;
     this.searchSequence += 1;
-
-    if (this.searchTimer) {
-      clearTimeout(this.searchTimer);
-      this.searchTimer = null;
-    }
   }
 
   @action
@@ -315,10 +365,8 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
   updateQuery(event) {
     this.query = event.target.value;
     this.searchResults = [];
-
-    if (this.searchTimer) {
-      clearTimeout(this.searchTimer);
-    }
+    this.searchActiveIndex = -1;
+    this.searchSequence += 1;
 
     const term = this.query.trim();
     if (term.length < 2) {
@@ -326,7 +374,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
       return;
     }
 
-    this.searchTimer = setTimeout(() => this.performSearch(term), 250);
+    this.performSearch(term);
   }
 
   async performSearch(term) {
@@ -334,21 +382,85 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.isSearching = true;
 
     try {
-      const response = await ajax(
-        getURL("/admin/plugins/messaging-preferences/user-search"),
-        { cache: false, data: { term } }
-      );
+      const result = await userSearch({
+        term,
+        includeGroups: false,
+        includeStagedUsers: false,
+        limit: SEARCH_LIMIT,
+      });
 
-      if (sequence === this.searchSequence) {
-        this.searchResults = response?.users || [];
+      if (sequence !== this.searchSequence || this.query.trim() !== term) {
+        return;
       }
+
+      const users = Array.isArray(result?.users)
+        ? result.users
+        : Array.isArray(result)
+          ? result.filter((item) => item?.isUser || item?.username)
+          : [];
+
+      this.searchResults = users.map(decorateSearchUser).filter(Boolean);
+      this.searchActiveIndex = -1;
     } catch {
       if (sequence === this.searchSequence) {
         this.searchResults = [];
+        this.searchActiveIndex = -1;
       }
     } finally {
       if (sequence === this.searchSequence) {
         this.isSearching = false;
+      }
+    }
+  }
+
+  setSearchActiveIndex(index) {
+    const lastIndex = this.searchResults.length - 1;
+    this.searchActiveIndex = Math.max(-1, Math.min(index, lastIndex));
+  }
+
+  @action
+  handleSearchKeydown(event) {
+    const lastIndex = this.searchResults.length - 1;
+
+    if (event.key === "Escape") {
+      if (this.searchResults.length > 0) {
+        event.preventDefault();
+      }
+      this.searchSequence += 1;
+      this.searchResults = [];
+      this.searchActiveIndex = -1;
+      this.isSearching = false;
+      return;
+    }
+
+    if (lastIndex < 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      this.setSearchActiveIndex(
+        this.searchActiveIndex >= lastIndex ? 0 : this.searchActiveIndex + 1
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      this.setSearchActiveIndex(
+        this.searchActiveIndex <= 0 ? lastIndex : this.searchActiveIndex - 1
+      );
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      this.setSearchActiveIndex(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      this.setSearchActiveIndex(lastIndex);
+    } else if (event.key === "Enter") {
+      const user =
+        this.searchResults[
+          this.searchActiveIndex >= 0 ? this.searchActiveIndex : 0
+        ];
+      if (user) {
+        event.preventDefault();
+        this.selectUser(user);
       }
     }
   }
@@ -358,6 +470,8 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.searchSequence += 1;
     this.query = user.username;
     this.searchResults = [];
+    this.searchActiveIndex = -1;
+    this.isSearching = false;
     return this.loadActivity(user.id);
   }
 
@@ -366,6 +480,8 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.searchSequence += 1;
     this.query = "";
     this.searchResults = [];
+    this.searchActiveIndex = -1;
+    this.isSearching = false;
     return this.loadActivity();
   }
 }

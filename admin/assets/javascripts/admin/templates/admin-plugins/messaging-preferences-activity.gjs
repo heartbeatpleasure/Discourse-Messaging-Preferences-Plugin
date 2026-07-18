@@ -2,7 +2,9 @@ import { fn } from "@ember/helper";
 import { on } from "@ember/modifier";
 import RouteTemplate from "ember-route-template";
 import getURL from "discourse/lib/get-url";
+import { eq } from "discourse/truth-helpers";
 import { i18n } from "discourse-i18n";
+import MessagingPreferencesUserLink from "../../components/messaging-preferences-user-link";
 
 const settingsUrl = getURL("/admin/site_settings/category/all_results?filter=messaging_preferences");
 const overviewUrl = getURL("/admin/plugins/messaging-preferences");
@@ -72,7 +74,7 @@ export default RouteTemplate(
       .mp-activity__summary-grid,
       .mp-activity__user-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
       }
 
@@ -153,9 +155,8 @@ export default RouteTemplate(
       .mp-activity__search-result {
         display: flex;
         width: 100%;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.1rem;
+        align-items: center;
+        gap: 0.7rem;
         padding: 0.65rem 0.75rem;
         border: 0;
         border-radius: var(--d-button-border-radius);
@@ -166,13 +167,56 @@ export default RouteTemplate(
       }
 
       .mp-activity__search-result:hover,
-      .mp-activity__search-result:focus-visible {
+      .mp-activity__search-result:focus-visible,
+      .mp-activity__search-result.is-active {
         background: var(--primary-very-low);
+        outline: 2px solid var(--tertiary);
+        outline-offset: -2px;
       }
 
+      .mp-activity__search-avatar {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+
+      .mp-activity__search-identity {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.1rem;
+      }
+
+      .mp-activity__search-identity strong,
       .mp-activity__search-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mp-activity__search-name,
+      .mp-activity__search-status,
+      .mp-activity__search-empty {
         color: var(--mp-muted);
         font-size: var(--font-down-1);
+      }
+
+      .mp-activity__search-status {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
+      .mp-activity__search-empty {
+        margin-top: 0.5rem;
       }
 
       .mp-activity__user-grid {
@@ -219,6 +263,22 @@ export default RouteTemplate(
       .mp-activity__table th {
         color: var(--mp-muted);
         font-size: var(--font-down-1);
+      }
+
+      .mp-activity__user-link {
+        color: var(--tertiary);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .mp-activity__user-link:hover,
+      .mp-activity__user-link:focus-visible {
+        text-decoration: underline;
+      }
+
+      .mp-activity__event-copy {
+        min-width: 0;
+        line-height: 1.45;
       }
 
       .mp-activity__status {
@@ -278,6 +338,11 @@ export default RouteTemplate(
 
         .mp-activity__actions {
           justify-content: flex-start;
+        }
+
+        .mp-activity__summary-grid,
+        .mp-activity__user-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .mp-activity__columns {
@@ -360,13 +425,6 @@ export default RouteTemplate(
       {{/unless}}
 
       {{#if @controller.hasData}}
-        <div class="mp-activity__notice">
-          {{i18n
-            "admin.messaging_preferences.activity.tracking_notice"
-            time=@controller.trackingStartedLabel
-          }}
-        </div>
-
         <section class="mp-activity__summary-grid">
           {{#each @controller.summaryCards as |card|}}
             <article class="mp-activity__summary-card">
@@ -405,36 +463,87 @@ export default RouteTemplate(
               placeholder={{i18n
                 "admin.messaging_preferences.activity.user.search_placeholder"
               }}
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              role="combobox"
               aria-label={{i18n
                 "admin.messaging_preferences.activity.user.search_label"
               }}
+              aria-autocomplete="list"
+              aria-expanded={{@controller.searchExpanded}}
+              aria-controls={{@controller.searchListboxId}}
+              aria-activedescendant={{@controller.searchActiveDescendant}}
               {{on "input" @controller.updateQuery}}
+              {{on "keydown" @controller.handleSearchKeydown}}
             />
 
+            <span
+              class="mp-activity__search-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {{@controller.searchStatusMessage}}
+            </span>
+
             {{#if @controller.searchResults.length}}
-              <ul class="mp-activity__search-results">
-                {{#each @controller.searchResults as |user|}}
-                  <li>
+              <ul
+                id={{@controller.searchListboxId}}
+                class="mp-activity__search-results"
+                role="listbox"
+                aria-label={{i18n
+                  "admin.messaging_preferences.activity.user.results_label"
+                }}
+              >
+                {{#each @controller.searchResults as |user index|}}
+                  <li role="presentation">
                     <button
+                      id="messaging-preferences-member-search-option-{{index}}"
                       type="button"
-                      class="mp-activity__search-result"
+                      class={{if
+                        (eq index @controller.searchActiveIndex)
+                        "mp-activity__search-result is-active"
+                        "mp-activity__search-result"
+                      }}
+                      role="option"
+                      aria-selected={{eq index @controller.searchActiveIndex}}
                       {{on "click" (fn @controller.selectUser user)}}
                     >
-                      <strong>@{{user.username}}</strong>
-                      {{#if user.name}}
-                        <span class="mp-activity__search-name">{{user.name}}</span>
+                      {{#if user.avatarUrl}}
+                        <img
+                          class="mp-activity__search-avatar"
+                          src={{user.avatarUrl}}
+                          alt=""
+                        />
                       {{/if}}
+                      <span class="mp-activity__search-identity">
+                        <strong>{{user.username}}</strong>
+                        {{#if user.name}}
+                          <span class="mp-activity__search-name">{{user.name}}</span>
+                        {{/if}}
+                      </span>
                     </button>
                   </li>
                 {{/each}}
               </ul>
+            {{else if @controller.showNoSearchResults}}
+              <p class="mp-activity__search-empty">
+                {{i18n "admin.messaging_preferences.activity.user.no_results"}}
+              </p>
             {{/if}}
           </div>
 
           {{#if @controller.selectedUser}}
             <div class="mp-activity__user-header">
               <div class="mp-activity__user-copy">
-                <h2>@{{@controller.selectedUser.user.username}}</h2>
+                <h2>
+                  <MessagingPreferencesUserLink
+                    @user={{@controller.selectedUser.user}}
+                  >
+                    {{@controller.selectedUser.user.username}}
+                  </MessagingPreferencesUserLink>
+                </h2>
                 {{#if @controller.selectedUser.user.name}}
                   <p class="mp-activity__muted">
                     {{@controller.selectedUser.user.name}}
@@ -473,7 +582,11 @@ export default RouteTemplate(
                       <tbody>
                         {{#each @controller.acknowledgementsReceived as |item|}}
                           <tr>
-                            <td>@{{item.user.username}}</td>
+                            <td>
+                              <MessagingPreferencesUserLink @user={{item.user}}>
+                                {{item.user.username}}
+                              </MessagingPreferencesUserLink>
+                            </td>
                             <td>{{item.dateLabel}}</td>
                             <td>
                               <span class="mp-activity__status {{item.statusClass}}">
@@ -511,7 +624,11 @@ export default RouteTemplate(
                       <tbody>
                         {{#each @controller.acknowledgementsMade as |item|}}
                           <tr>
-                            <td>@{{item.user.username}}</td>
+                            <td>
+                              <MessagingPreferencesUserLink @user={{item.user}}>
+                                {{item.user.username}}
+                              </MessagingPreferencesUserLink>
+                            </td>
                             <td>{{item.dateLabel}}</td>
                             <td>
                               <span class="mp-activity__status {{item.statusClass}}">
@@ -537,7 +654,36 @@ export default RouteTemplate(
                 <div class="mp-activity__events">
                   {{#each @controller.selectedUserEvents as |event|}}
                     <article class="mp-activity__event">
-                      <div>{{event.label}}</div>
+                      <div class="mp-activity__event-copy">
+                        {{#if (eq event.event_type "acknowledged")}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{i18n "admin.messaging_preferences.activity.events.acknowledged_action"}}
+                          <MessagingPreferencesUserLink @user={{event.target}}>
+                            {{event.targetDisplay}}
+                          </MessagingPreferencesUserLink>{{i18n
+                            "admin.messaging_preferences.activity.events.acknowledged_suffix"
+                          }}
+                        {{else}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{#if (eq event.event_type "preferences_created")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_created_action"
+                            }}
+                          {{else if (eq event.event_type "preferences_updated")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_updated_action"
+                            }}
+                          {{else if (eq event.event_type "preferences_cleared")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_cleared_action"
+                            }}
+                          {{/if}}
+                        {{/if}}
+                      </div>
                       <time class="mp-activity__event-time">{{event.dateLabel}}</time>
                     </article>
                   {{/each}}
@@ -563,7 +709,36 @@ export default RouteTemplate(
             <div class="mp-activity__events">
               {{#each @controller.recentEvents as |event|}}
                 <article class="mp-activity__event">
-                  <div>{{event.label}}</div>
+                  <div class="mp-activity__event-copy">
+                        {{#if (eq event.event_type "acknowledged")}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{i18n "admin.messaging_preferences.activity.events.acknowledged_action"}}
+                          <MessagingPreferencesUserLink @user={{event.target}}>
+                            {{event.targetDisplay}}
+                          </MessagingPreferencesUserLink>{{i18n
+                            "admin.messaging_preferences.activity.events.acknowledged_suffix"
+                          }}
+                        {{else}}
+                          <MessagingPreferencesUserLink @user={{event.actor}}>
+                            {{event.actorDisplay}}
+                          </MessagingPreferencesUserLink>
+                          {{#if (eq event.event_type "preferences_created")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_created_action"
+                            }}
+                          {{else if (eq event.event_type "preferences_updated")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_updated_action"
+                            }}
+                          {{else if (eq event.event_type "preferences_cleared")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_cleared_action"
+                            }}
+                          {{/if}}
+                        {{/if}}
+                  </div>
                   <time class="mp-activity__event-time">{{event.dateLabel}}</time>
                 </article>
               {{/each}}

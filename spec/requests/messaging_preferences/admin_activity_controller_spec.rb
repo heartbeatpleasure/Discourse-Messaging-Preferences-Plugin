@@ -34,14 +34,4 @@ RSpec.describe MessagingPreferences::AdminActivityController, type: :request do
     )
     expect(response.body).not_to include("Introduce yourself")
   end
-
-  it "returns member search results to an administrator" do
-    sign_in(admin)
-
-    get "/admin/plugins/messaging-preferences/user-search.json",
-        params: { term: member.username[0, 3] }
-
-    expect(response.status).to eq(200)
-    expect(response.parsed_body.fetch("users").map { |user| user["id"] }).to include(member.id)
-  end
 end

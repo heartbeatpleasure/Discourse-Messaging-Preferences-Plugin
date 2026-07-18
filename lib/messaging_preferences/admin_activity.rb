@@ -13,31 +13,10 @@ module ::MessagingPreferences
 
         {
           generated_at: Time.zone.now.iso8601(6),
-          tracking_started_at: tracking_started_at,
           summary: summary(states, acknowledgements),
           recent_events: recent_events,
           selected_user: user_id.present? ? user_payload(user_id, states) : nil,
         }
-      end
-
-      def search_users(term)
-        normalized = term.to_s.strip
-        return [] if normalized.length < 2
-
-        pattern = "%#{ActiveRecord::Base.sanitize_sql_like(normalized.downcase)}%"
-
-        ::User
-          .where(active: true, staged: false)
-          .where(
-            "username_lower LIKE :pattern OR LOWER(COALESCE(name, '')) LIKE :pattern",
-            pattern: pattern,
-          )
-          .order(:username_lower)
-          .limit(20)
-          .pluck(:id, :username, :name, :avatar_template)
-          .map do |id, username, name, avatar_template|
-            { id: id, username: username, name: name, avatar_template: avatar_template }
-          end
       end
 
       private
@@ -145,12 +124,6 @@ module ::MessagingPreferences
         return {} if !::MessagingPreferences::Event.table_ready?
 
         ::MessagingPreferences::Event.group(:event_type).count
-      end
-
-      def tracking_started_at
-        return if !::MessagingPreferences::Event.table_ready?
-
-        ::MessagingPreferences::Event.minimum(:occurred_at)&.iso8601(6)
       end
 
       def recent_events

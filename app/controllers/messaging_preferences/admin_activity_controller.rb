@@ -10,12 +10,5 @@ module ::MessagingPreferences
         ::MessagingPreferences::AdminActivity.payload(user_id: params[:user_id]),
       )
     end
-
-    def user_search
-      response.headers["Cache-Control"] = "no-store"
-      render_json_dump(
-        users: ::MessagingPreferences::AdminActivity.search_users(params[:term]),
-      )
-    end
   end
 end

@@ -2,7 +2,7 @@
 
 # name: Discourse-Messaging-Preferences-Plugin
 # about: Lets members define private messaging preferences for personal messages and direct chats.
-# version: 0.4.0
+# version: 0.5.0
 # authors: Chris
 # url: https://github.com/xxxxxx/Discourse-Messaging-Preferences-Plugin
 
@@ -123,10 +123,6 @@ after_initialize do
         constraints: AdminConstraint.new
     get "/admin/plugins/messaging-preferences/activity" =>
           "messaging_preferences/admin_activity#index",
-        defaults: { format: :json },
-        constraints: AdminConstraint.new
-    get "/admin/plugins/messaging-preferences/user-search" =>
-          "messaging_preferences/admin_activity#user_search",
         defaults: { format: :json },
         constraints: AdminConstraint.new
 
