@@ -14,6 +14,39 @@ module ::MessagingPreferences
       render json: { messaging_preferences: snapshot.payload_for(current_user) }
     end
 
+    def update
+      RateLimiter.new(current_user, "messaging-preferences-update", 30, 1.minute).performed!
+
+      values = {
+        ::MessagingPreferences::WORKS_WELL_FIELD =>
+          ::MessagingPreferences.normalize_text(params[:works_well]),
+        ::MessagingPreferences::PLEASE_AVOID_FIELD =>
+          ::MessagingPreferences.normalize_text(params[:please_avoid]),
+      }
+
+      if values.values.any? { |value| value.length > ::MessagingPreferences::MAX_LENGTH }
+        return render json: {
+                        errors: [
+                          I18n.t(
+                            "messaging_preferences.errors.too_long",
+                            maximum: ::MessagingPreferences::MAX_LENGTH,
+                          ),
+                        ],
+                        error_type: "too_long",
+                      },
+                      status: :unprocessable_entity
+      end
+
+      ::UserCustomField.transaction do
+        values.each { |field_name, value| persist_field!(field_name, value) }
+      end
+
+      current_user.clear_custom_fields
+      snapshot = ::MessagingPreferences::PreferenceSnapshot.new(current_user)
+
+      render json: { success: true, messaging_preferences: snapshot.payload_for(current_user) }
+    end
+
     def acknowledge
       if !::MessagingPreferences::Acknowledgement.table_ready?
         return render_error("database_not_ready", :service_unavailable)
@@ -79,6 +112,21 @@ module ::MessagingPreferences
         ::User.where(active: true, staged: false).find_by!(
           username_lower: params[:username].to_s.downcase,
         )
+    end
+
+    def persist_field!(field_name, value)
+      fields = ::UserCustomField.where(user_id: current_user.id, name: field_name).order(:id)
+
+      if value.blank?
+        fields.delete_all
+        return
+      end
+
+      field = fields.first || ::UserCustomField.new(user_id: current_user.id, name: field_name)
+      field.value = value
+      field.save!
+
+      fields.where.not(id: field.id).delete_all
     end
 
     def render_error(key, status)

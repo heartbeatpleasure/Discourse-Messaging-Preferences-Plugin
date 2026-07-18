@@ -49,6 +49,55 @@ RSpec.describe "Messaging Preferences API", type: :request do
     )
   end
 
+  it "persists the current member's preferences through the plugin endpoint" do
+    sign_in(target)
+
+    put "/messaging-preferences/v1/me",
+        params: {
+          works_well: "  A clear introduction.  ",
+          please_avoid: "Repeated messages.\r\nPressure to reply.",
+        }
+
+    expect(response.status).to eq(200)
+    expect(response.parsed_body.dig("messaging_preferences", "works_well")).to eq(
+      "A clear introduction.",
+    )
+    expect(response.parsed_body.dig("messaging_preferences", "please_avoid")).to eq(
+      "Repeated messages.\nPressure to reply.",
+    )
+    expect(
+      UserCustomField.find_by!(
+        user_id: target.id,
+        name: MessagingPreferences::WORKS_WELL_FIELD,
+      ).value,
+    ).to eq("A clear introduction.")
+  end
+
+  it "removes empty preferences through the plugin endpoint" do
+    sign_in(target)
+
+    put "/messaging-preferences/v1/me", params: { works_well: "", please_avoid: "" }
+
+    expect(response.status).to eq(200)
+    expect(response.parsed_body.dig("messaging_preferences", "has_preferences")).to eq(false)
+    expect(
+      UserCustomField.where(
+        user_id: target.id,
+        name: MessagingPreferences::FIELD_NAMES,
+      ),
+    ).to be_empty
+  end
+
+  it "rejects preference text longer than the configured maximum" do
+    sign_in(target)
+
+    put "/messaging-preferences/v1/me",
+        params: { works_well: "x" * (MessagingPreferences::MAX_LENGTH + 1) }
+
+    expect(response.status).to eq(422)
+    expect(response.parsed_body["error_type"]).to eq("too_long")
+  end
+
   it "stores an acknowledgement for the exact snapshot shown to the viewer" do
     get "/messaging-preferences/v1/users/#{target.username}"
     digest = response.parsed_body.dig("messaging_preferences", "preferences_digest")

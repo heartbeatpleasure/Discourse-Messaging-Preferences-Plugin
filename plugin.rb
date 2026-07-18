@@ -2,7 +2,7 @@
 
 # name: Discourse-Messaging-Preferences-Plugin
 # about: Lets members define private messaging preferences for personal messages and direct chats.
-# version: 0.1.0
+# version: 0.2.0
 # authors: Chris
 # url: https://github.com/xxxxxx/Discourse-Messaging-Preferences-Plugin
 
@@ -107,6 +107,10 @@ after_initialize do
   Discourse::Application.routes.append do
     get "/messaging-preferences/v1/users/:username" =>
           "messaging_preferences/preferences#show",
+        defaults: { format: :json }
+
+    put "/messaging-preferences/v1/me" =>
+          "messaging_preferences/preferences#update",
         defaults: { format: :json }
 
     post "/messaging-preferences/v1/users/:username/acknowledge" =>

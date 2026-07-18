@@ -31,13 +31,10 @@ module ::MessagingPreferences
     def digest
       return if !present?
 
-      payload = [
-        DIGEST_VERSION,
-        works_well,
-        timestamp_for(::MessagingPreferences::WORKS_WELL_FIELD),
-        please_avoid,
-        timestamp_for(::MessagingPreferences::PLEASE_AVOID_FIELD),
-      ]
+      # The digest represents the content the viewer saw. Timestamps are not
+      # included, so saving unchanged text does not unnecessarily invalidate
+      # an existing acknowledgement.
+      payload = [DIGEST_VERSION, works_well, please_avoid]
 
       Digest::SHA256.hexdigest(payload.join("\u001F"))
     end
@@ -86,10 +83,6 @@ module ::MessagingPreferences
 
     def value_for(field_name)
       ::MessagingPreferences.normalize_text(field_rows[field_name]&.value)
-    end
-
-    def timestamp_for(field_name)
-      field_rows[field_name]&.updated_at&.utc&.iso8601(6).to_s
     end
   end
 end
