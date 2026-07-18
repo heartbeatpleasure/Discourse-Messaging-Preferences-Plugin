@@ -73,6 +73,13 @@ RSpec.describe "Messaging Preferences API", type: :request do
         name: MessagingPreferences::WORKS_WELL_FIELD,
       ).value,
     ).to eq("A clear introduction.")
+    expect(
+      MessagingPreferences::Event.where(
+        event_type: "preferences_updated",
+        actor_user_id: target.id,
+        target_user_id: target.id,
+      ).count,
+    ).to eq(1)
   end
 
   it "removes empty preferences through the plugin endpoint" do
@@ -119,6 +126,31 @@ RSpec.describe "Messaging Preferences API", type: :request do
         preferences_digest: digest,
       ),
     ).to eq(true)
+    expect(
+      MessagingPreferences::Event.where(
+        event_type: "acknowledged",
+        actor_user_id: viewer.id,
+        target_user_id: target.id,
+      ).count,
+    ).to eq(1)
+  end
+
+  it "does not duplicate tracked acknowledgements for the same current version" do
+    digest = MessagingPreferences::PreferenceSnapshot.new(target).digest
+
+    2.times do
+      post "/messaging-preferences/v1/users/#{target.username}/acknowledge",
+           params: { preferences_digest: digest }
+      expect(response.status).to eq(200)
+    end
+
+    expect(
+      MessagingPreferences::Event.where(
+        event_type: "acknowledged",
+        actor_user_id: viewer.id,
+        target_user_id: target.id,
+      ).count,
+    ).to eq(1)
   end
 
   it "rejects an acknowledgement when the preferences changed after they were read" do

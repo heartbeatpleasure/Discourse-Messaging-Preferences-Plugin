@@ -8,6 +8,15 @@ module ::MessagingPreferences
 
     attr_reader :target_user
 
+    def self.digest_for(works_well:, please_avoid:)
+      normalized_works_well = ::MessagingPreferences.normalize_text(works_well)
+      normalized_please_avoid = ::MessagingPreferences.normalize_text(please_avoid)
+      return if normalized_works_well.blank? && normalized_please_avoid.blank?
+
+      payload = [DIGEST_VERSION, normalized_works_well, normalized_please_avoid]
+      Digest::SHA256.hexdigest(payload.join("\u001F"))
+    end
+
     def initialize(target_user)
       @target_user = target_user
     end
@@ -34,9 +43,7 @@ module ::MessagingPreferences
       # The digest represents the content the viewer saw. Timestamps are not
       # included, so saving unchanged text does not unnecessarily invalidate
       # an existing acknowledgement.
-      payload = [DIGEST_VERSION, works_well, please_avoid]
-
-      Digest::SHA256.hexdigest(payload.join("\u001F"))
+      self.class.digest_for(works_well: works_well, please_avoid: please_avoid)
     end
 
     def acknowledgement_for(viewer)

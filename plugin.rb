@@ -2,9 +2,11 @@
 
 # name: Discourse-Messaging-Preferences-Plugin
 # about: Lets members define private messaging preferences for personal messages and direct chats.
-# version: 0.3.0
+# version: 0.4.0
 # authors: Chris
 # url: https://github.com/xxxxxx/Discourse-Messaging-Preferences-Plugin
+
+add_admin_route "admin.messaging_preferences.title", "messagingPreferences"
 
 enabled_site_setting :messaging_preferences_enabled
 
@@ -31,10 +33,20 @@ after_initialize do
     "app/models/messaging_preferences/acknowledgement.rb",
     __dir__,
   )
+  require_dependency File.expand_path(
+    "app/models/messaging_preferences/event.rb",
+    __dir__,
+  )
   require_relative "lib/messaging_preferences/preference_snapshot"
+  require_relative "lib/messaging_preferences/event_recorder"
+  require_relative "lib/messaging_preferences/admin_activity"
   require_relative "lib/messaging_preferences/user_lifecycle_cleanup"
   require_dependency File.expand_path(
     "app/controllers/messaging_preferences/preferences_controller.rb",
+    __dir__,
+  )
+  require_dependency File.expand_path(
+    "app/controllers/messaging_preferences/admin_activity_controller.rb",
     __dir__,
   )
 
@@ -105,6 +117,19 @@ after_initialize do
   end
 
   Discourse::Application.routes.append do
+    get "/admin/plugins/messaging-preferences" => "admin/plugins#index",
+        constraints: AdminConstraint.new
+    get "/admin/plugins/messaging-preferences-activity" => "admin/plugins#index",
+        constraints: AdminConstraint.new
+    get "/admin/plugins/messaging-preferences/activity" =>
+          "messaging_preferences/admin_activity#index",
+        defaults: { format: :json },
+        constraints: AdminConstraint.new
+    get "/admin/plugins/messaging-preferences/user-search" =>
+          "messaging_preferences/admin_activity#user_search",
+        defaults: { format: :json },
+        constraints: AdminConstraint.new
+
     get "/messaging-preferences/v1/users/:username" =>
           "messaging_preferences/preferences#show",
         defaults: { format: :json }

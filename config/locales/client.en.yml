@@ -1,0 +1,81 @@
+en:
+  admin_js:
+    admin:
+      messaging_preferences:
+        title: "Messaging Preferences"
+        description: "Administration and privacy-safe activity insights for member-defined messaging preferences."
+        open_settings: "Open settings"
+        open_tool: "Open tool"
+        overview_title: "Admin tools"
+        overview_description: "Configure Messaging Preferences and review privacy-safe usage and acknowledgement activity."
+        settings_description: "Configure where preferences appear, whether acknowledgement is required, reminders, and staff behaviour."
+        category_configuration: "Configuration"
+        category_activity: "Insights"
+
+        activity:
+          title: "Messaging Preferences activity"
+          short_title: "Activity"
+          description: "Review current usage, acknowledgement state, tracked changes, and member-specific activity without displaying preference text."
+          back_to_overview: "Back to overview"
+          refresh: "Refresh"
+          refreshing: "Refreshing…"
+          loading: "Loading Messaging Preferences activity…"
+          load_error: "Messaging Preferences activity could not be loaded. Check the browser console and Rails logs."
+          last_checked: "Last checked: %{time}"
+          not_available: "Not available"
+          tracking_not_started: "No tracked events yet"
+          tracking_notice: "Current totals use the existing database state. Detailed change and Got it history is tracked from this update onward; earlier individual events cannot be reconstructed. Tracking started: %{time}."
+          current: "Current"
+          outdated: "Outdated"
+          set: "Set"
+          not_set: "Not set"
+          unknown_user: "Unknown member"
+          recent_title: "Recent activity"
+          recent_description: "Privacy-safe events only. Preference text is never included on this page or in the activity table."
+          no_tracked_events: "No tracked activity is available yet."
+
+          cards:
+            members_with_preferences: "Members using preferences"
+            members_with_preferences_detail: "%{both} use both fields, %{worksWell} use only What works well, and %{pleaseAvoid} use only Please avoid."
+            updated_recently: "Members updated in 30 days"
+            updated_recently_detail: "Based on the latest database update time of the currently stored preference fields."
+            current_acknowledgements: "Current acknowledgements"
+            current_acknowledgements_detail: "%{total} relationship record(s) exist; %{outdated} refer to an older preference version."
+            acknowledging_members: "Members who acknowledged"
+            acknowledging_members_detail: "Current and older relationship records cover %{owners} preference owner(s)."
+            preference_changes: "Preference changes"
+            got_it_confirmations: "Got it confirmations"
+            tracked_since_update: "Tracked from this update onward; earlier events cannot be reconstructed."
+
+          user:
+            title: "Member activity"
+            description: "Search for a member to review current preference status, acknowledgement relationships, and up to 100 recent tracked events."
+            search_label: "Search members"
+            search_placeholder: "Search by username or name"
+            clear: "Clear member"
+            received_title: "Who acknowledged this member"
+            made_title: "Preferences this member acknowledged"
+            history_title: "Tracked member history"
+            no_received: "No acknowledgement relationships were found for this member."
+            no_made: "This member has not acknowledged any currently retained preference relationship."
+            cards:
+              preference_status: "Current preference status"
+              preference_status_detail: "What works well: %{worksWell}; Please avoid: %{pleaseAvoid}."
+              last_modified: "Last database update"
+              last_modified_detail: "Latest update time of the currently stored preference fields."
+              changes: "Tracked changes"
+              current_received: "Current acknowledgements received"
+              current_received_detail: "%{tracked} acknowledgement event(s) received have been tracked since this update."
+              current_made: "Current acknowledgements made"
+              current_made_detail: "%{tracked} acknowledgement event(s) made have been tracked since this update."
+
+          columns:
+            member: "Member"
+            time: "Time"
+            status: "Version"
+
+          events:
+            preferences_created: "@%{actor} created messaging preferences."
+            preferences_updated: "@%{actor} changed messaging preferences."
+            preferences_cleared: "@%{actor} cleared messaging preferences."
+            acknowledged: "@%{actor} acknowledged @%{target}'s messaging preferences."

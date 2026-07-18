@@ -8,6 +8,7 @@ module ::MessagingPreferences
 
     before_action :ensure_logged_in
     before_action :ensure_enabled
+    before_action :disable_response_caching
 
     def show
       snapshot = ::MessagingPreferences::PreferenceSnapshot.new(target_user)
@@ -37,17 +38,27 @@ module ::MessagingPreferences
                       status: :unprocessable_entity
       end
 
+      before_snapshot = ::MessagingPreferences::PreferenceSnapshot.new(current_user)
+      before_snapshot.digest
+
       ::UserCustomField.transaction do
         values.each { |field_name, value| persist_field!(field_name, value) }
       end
 
       current_user.clear_custom_fields
       snapshot = ::MessagingPreferences::PreferenceSnapshot.new(current_user)
+      ::MessagingPreferences::EventRecorder.record_preference_change!(
+        user: current_user,
+        before_snapshot: before_snapshot,
+        after_snapshot: snapshot,
+      )
 
       render json: { success: true, messaging_preferences: snapshot.payload_for(current_user) }
     end
 
     def acknowledge
+      RateLimiter.new(current_user, "messaging-preferences-acknowledge", 60, 1.minute).performed!
+
       if !::MessagingPreferences::Acknowledgement.table_ready?
         return render_error("database_not_ready", :service_unavailable)
       end
@@ -71,24 +82,42 @@ module ::MessagingPreferences
         return render_error("stale_preferences", :conflict)
       end
 
-      now = Time.zone.now
-      attributes = {
-        viewer_user_id: current_user.id,
-        target_user_id: target.id,
-        preferences_digest: snapshot.digest,
-        acknowledged_at: now,
-        created_at: now,
-        updated_at: now,
-      }
+      existing_acknowledgement =
+        ::MessagingPreferences::Acknowledgement.find_by(
+          viewer_user_id: current_user.id,
+          target_user_id: target.id,
+        )
+      already_current = existing_acknowledgement&.preferences_digest == snapshot.digest
 
-      ::MessagingPreferences::Acknowledgement.upsert(
-        attributes,
-        unique_by: %i[viewer_user_id target_user_id],
-      )
+      acknowledgement = existing_acknowledgement
 
-      acknowledgement = ::MessagingPreferences::Acknowledgement.find_by!(
-        viewer_user_id: current_user.id,
-        target_user_id: target.id,
+      if !already_current
+        now = Time.zone.now
+        attributes = {
+          viewer_user_id: current_user.id,
+          target_user_id: target.id,
+          preferences_digest: snapshot.digest,
+          acknowledged_at: now,
+          created_at: now,
+          updated_at: now,
+        }
+
+        ::MessagingPreferences::Acknowledgement.upsert(
+          attributes,
+          unique_by: %i[viewer_user_id target_user_id],
+        )
+
+        acknowledgement = ::MessagingPreferences::Acknowledgement.find_by!(
+          viewer_user_id: current_user.id,
+          target_user_id: target.id,
+        )
+      end
+
+      ::MessagingPreferences::EventRecorder.record_acknowledgement!(
+        viewer: current_user,
+        target: target,
+        digest: snapshot.digest,
+        already_current: already_current,
       )
 
       render json: {
@@ -105,6 +134,10 @@ module ::MessagingPreferences
 
     def ensure_enabled
       raise Discourse::NotFound if !SiteSetting.messaging_preferences_enabled
+    end
+
+    def disable_response_caching
+      response.headers["Cache-Control"] = "no-store"
     end
 
     def target_user
