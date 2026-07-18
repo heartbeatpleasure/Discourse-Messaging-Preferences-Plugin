@@ -242,6 +242,46 @@ export default RouteTemplate(
         margin-bottom: 0.75rem;
       }
 
+      .mp-activity__maintenance-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .mp-activity__maintenance-card {
+        min-width: 0;
+        padding: 1rem;
+        border: 1px solid var(--mp-border);
+        border-radius: 16px;
+        background: var(--mp-surface-alt);
+      }
+
+      .mp-activity__maintenance-card h3 {
+        margin-bottom: 0.45rem;
+      }
+
+      .mp-activity__maintenance-copy {
+        display: grid;
+        gap: 0.35rem;
+        color: var(--mp-muted);
+      }
+
+      .mp-activity__maintenance-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.9rem;
+      }
+
+      .mp-activity__member-maintenance {
+        margin-top: 1rem;
+      }
+
+      .mp-activity__member-maintenance .mp-activity__maintenance-actions {
+        margin-top: 0.75rem;
+      }
+
       .mp-activity__table-wrap {
         width: 100%;
         overflow-x: auto;
@@ -345,7 +385,8 @@ export default RouteTemplate(
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .mp-activity__columns {
+        .mp-activity__columns,
+        .mp-activity__maintenance-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -562,6 +603,42 @@ export default RouteTemplate(
               {{/each}}
             </div>
 
+            <section class="mp-activity__subpanel mp-activity__member-maintenance">
+              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.member_title"}}</h3>
+              <p class="mp-activity__muted">
+                {{i18n
+                  "admin.messaging_preferences.activity.maintenance.member_description"
+                  username=@controller.selectedUser.user.username
+                }}
+              </p>
+              <div class="mp-activity__maintenance-copy">
+                <span>{{@controller.selectedMemberPreferencesLabel}}</span>
+                <span>{{@controller.selectedMemberAcknowledgementsLabel}}</span>
+              </div>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.resetSelectedMemberAcknowledgements}}
+                >
+                  {{i18n
+                    "admin.messaging_preferences.activity.maintenance.reset_member_acknowledgements"
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.clearSelectedMemberPreferences}}
+                >
+                  {{i18n
+                    "admin.messaging_preferences.activity.maintenance.clear_member_preferences"
+                  }}
+                </button>
+              </div>
+            </section>
+
             <div class="mp-activity__columns">
               <section class="mp-activity__subpanel">
                 <h3>
@@ -681,6 +758,15 @@ export default RouteTemplate(
                             {{i18n
                               "admin.messaging_preferences.activity.events.preferences_cleared_action"
                             }}
+                          {{else if (eq event.event_type "preferences_admin_cleared")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"
+                            }}
+                            <MessagingPreferencesUserLink @user={{event.target}}>
+                              {{event.targetDisplay}}
+                            </MessagingPreferencesUserLink>{{i18n
+                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_suffix"
+                            }}
                           {{/if}}
                         {{/if}}
                       </div>
@@ -695,6 +781,63 @@ export default RouteTemplate(
               {{/if}}
             </section>
           {{/if}}
+        </section>
+
+        <section class="mp-activity__panel">
+          <div class="mp-activity__panel-copy">
+            <h2>{{i18n "admin.messaging_preferences.activity.maintenance.title"}}</h2>
+            <p class="mp-activity__muted">
+              {{i18n "admin.messaging_preferences.activity.maintenance.description"}}
+            </p>
+          </div>
+
+          <div class="mp-activity__maintenance-grid">
+            <article class="mp-activity__maintenance-card">
+              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.retention_title"}}</h3>
+              <div class="mp-activity__maintenance-copy">
+                <span>{{@controller.retentionLabel}}</span>
+                <span>{{@controller.retainedEventsLabel}}</span>
+                <span>{{@controller.expiredEventsLabel}}</span>
+              </div>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.runCleanup}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.maintenance.run_cleanup"}}
+                </button>
+              </div>
+            </article>
+
+            <article class="mp-activity__maintenance-card">
+              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.integrity_title"}}</h3>
+              <div class="mp-activity__maintenance-copy">
+                <span>{{@controller.integrityLabel}}</span>
+              </div>
+              <div class="mp-activity__maintenance-actions">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.resetAllAcknowledgements}}
+                >
+                  {{i18n
+                    "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements"
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  disabled={{@controller.isMaintaining}}
+                  {{on "click" @controller.clearActivityHistory}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.maintenance.clear_history"}}
+                </button>
+              </div>
+            </article>
+          </div>
         </section>
 
         <section class="mp-activity__panel">
@@ -735,6 +878,15 @@ export default RouteTemplate(
                           {{else if (eq event.event_type "preferences_cleared")}}
                             {{i18n
                               "admin.messaging_preferences.activity.events.preferences_cleared_action"
+                            }}
+                          {{else if (eq event.event_type "preferences_admin_cleared")}}
+                            {{i18n
+                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"
+                            }}
+                            <MessagingPreferencesUserLink @user={{event.target}}>
+                              {{event.targetDisplay}}
+                            </MessagingPreferencesUserLink>{{i18n
+                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_suffix"
                             }}
                           {{/if}}
                         {{/if}}

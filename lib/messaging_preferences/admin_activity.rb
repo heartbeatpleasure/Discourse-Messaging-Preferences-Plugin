@@ -16,6 +16,7 @@ module ::MessagingPreferences
           summary: summary(states, acknowledgements),
           recent_events: recent_events,
           selected_user: user_id.present? ? user_payload(user_id, states) : nil,
+          maintenance: ::MessagingPreferences::DataMaintenance.status(user_id: user_id),
         }
       end
 

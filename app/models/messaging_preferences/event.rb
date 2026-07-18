@@ -8,6 +8,7 @@ module ::MessagingPreferences
       preferences_created
       preferences_updated
       preferences_cleared
+      preferences_admin_cleared
     ].freeze
     ACKNOWLEDGEMENT_EVENT_TYPE = "acknowledged"
     EVENT_TYPES = (PREFERENCE_EVENT_TYPES + [ACKNOWLEDGEMENT_EVENT_TYPE]).freeze

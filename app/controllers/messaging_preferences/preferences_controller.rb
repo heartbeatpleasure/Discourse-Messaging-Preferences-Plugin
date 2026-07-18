@@ -4,6 +4,10 @@ module ::MessagingPreferences
   class PreferencesController < ::ApplicationController
     requires_plugin ::MessagingPreferences::PLUGIN_NAME
 
+    UPDATE_RATE_LIMIT = 30
+    ACKNOWLEDGEMENT_RATE_LIMIT = 60
+    TARGET_ACKNOWLEDGEMENT_RATE_LIMIT = 10
+
     skip_before_action :check_xhr, raise: false
 
     before_action :ensure_logged_in
@@ -16,7 +20,12 @@ module ::MessagingPreferences
     end
 
     def update
-      RateLimiter.new(current_user, "messaging-preferences-update", 30, 1.minute).performed!
+      RateLimiter.new(
+        current_user,
+        "messaging-preferences-update",
+        UPDATE_RATE_LIMIT,
+        1.minute,
+      ).performed!
 
       values = {
         ::MessagingPreferences::WORKS_WELL_FIELD =>
@@ -38,26 +47,36 @@ module ::MessagingPreferences
                       status: :unprocessable_entity
       end
 
-      before_snapshot = ::MessagingPreferences::PreferenceSnapshot.new(current_user)
-      before_snapshot.digest
+      snapshot = nil
 
-      ::UserCustomField.transaction do
-        values.each { |field_name, value| persist_field!(field_name, value) }
+      ::User.transaction do
+        locked_user = ::User.lock.find(current_user.id)
+        before_snapshot = ::MessagingPreferences::PreferenceSnapshot.new(locked_user)
+        before_snapshot.digest
+
+        values.each do |field_name, value|
+          persist_field!(locked_user.id, field_name, value)
+        end
+
+        locked_user.clear_custom_fields
+        snapshot = ::MessagingPreferences::PreferenceSnapshot.new(locked_user)
+        ::MessagingPreferences::EventRecorder.record_preference_change!(
+          user: locked_user,
+          before_snapshot: before_snapshot,
+          after_snapshot: snapshot,
+        )
       end
-
-      current_user.clear_custom_fields
-      snapshot = ::MessagingPreferences::PreferenceSnapshot.new(current_user)
-      ::MessagingPreferences::EventRecorder.record_preference_change!(
-        user: current_user,
-        before_snapshot: before_snapshot,
-        after_snapshot: snapshot,
-      )
 
       render json: { success: true, messaging_preferences: snapshot.payload_for(current_user) }
     end
 
     def acknowledge
-      RateLimiter.new(current_user, "messaging-preferences-acknowledge", 60, 1.minute).performed!
+      RateLimiter.new(
+        current_user,
+        "messaging-preferences-acknowledge",
+        ACKNOWLEDGEMENT_RATE_LIMIT,
+        1.minute,
+      ).performed!
 
       if !::MessagingPreferences::Acknowledgement.table_ready?
         return render_error("database_not_ready", :service_unavailable)
@@ -65,60 +84,76 @@ module ::MessagingPreferences
 
       target = target_user
 
+      RateLimiter.new(
+        current_user,
+        "messaging-preferences-acknowledge-#{target.id}",
+        TARGET_ACKNOWLEDGEMENT_RATE_LIMIT,
+        1.minute,
+      ).performed!
+
       if target.id == current_user.id
         return render_error("own_preferences", :unprocessable_entity)
       end
 
-      snapshot = ::MessagingPreferences::PreferenceSnapshot.new(target)
-      return render_error("no_preferences", :unprocessable_entity) if !snapshot.present?
-
       supplied_digest = params[:preferences_digest].to_s
-      current_digest = snapshot.digest
-      digest_matches =
-        supplied_digest.bytesize == current_digest.bytesize &&
-          ActiveSupport::SecurityUtils.secure_compare(supplied_digest, current_digest)
+      error_key = nil
+      error_status = nil
+      acknowledgement = nil
+      snapshot = nil
 
-      if supplied_digest.blank? || !digest_matches
-        return render_error("stale_preferences", :conflict)
+      ::User.transaction do
+        locked_users =
+          ::User
+            .where(id: [current_user.id, target.id], active: true, staged: false)
+            .order(:id)
+            .lock
+            .index_by(&:id)
+
+        locked_viewer = locked_users[current_user.id]
+        locked_target = locked_users[target.id]
+        raise ActiveRecord::RecordNotFound if locked_viewer.blank? || locked_target.blank?
+
+        snapshot = ::MessagingPreferences::PreferenceSnapshot.new(locked_target)
+
+        if !snapshot.present?
+          error_key = "no_preferences"
+          error_status = :unprocessable_entity
+          raise ActiveRecord::Rollback
+        end
+
+        current_digest = snapshot.digest
+        digest_matches =
+          supplied_digest.bytesize == current_digest.bytesize &&
+            ActiveSupport::SecurityUtils.secure_compare(supplied_digest, current_digest)
+
+        if supplied_digest.blank? || !digest_matches
+          error_key = "stale_preferences"
+          error_status = :conflict
+          raise ActiveRecord::Rollback
+        end
+
+        acknowledgement =
+          ::MessagingPreferences::Acknowledgement.lock.find_or_initialize_by(
+            viewer_user_id: locked_viewer.id,
+            target_user_id: locked_target.id,
+          )
+        already_current = acknowledgement.persisted? && acknowledgement.preferences_digest == current_digest
+
+        if !already_current
+          acknowledgement.preferences_digest = current_digest
+          acknowledgement.acknowledged_at = Time.zone.now
+          acknowledgement.save!
+        end
+
+        ::MessagingPreferences::EventRecorder.record_acknowledgement!(
+          viewer: locked_viewer,
+          target: locked_target,
+          digest: current_digest,
+          already_current: already_current,
+        )
       end
 
-      existing_acknowledgement =
-        ::MessagingPreferences::Acknowledgement.find_by(
-          viewer_user_id: current_user.id,
-          target_user_id: target.id,
-        )
-      already_current = existing_acknowledgement&.preferences_digest == snapshot.digest
-
-      acknowledgement = existing_acknowledgement
-
-      if !already_current
-        now = Time.zone.now
-        attributes = {
-          viewer_user_id: current_user.id,
-          target_user_id: target.id,
-          preferences_digest: snapshot.digest,
-          acknowledged_at: now,
-          created_at: now,
-          updated_at: now,
-        }
-
-        ::MessagingPreferences::Acknowledgement.upsert(
-          attributes,
-          unique_by: %i[viewer_user_id target_user_id],
-        )
-
-        acknowledgement = ::MessagingPreferences::Acknowledgement.find_by!(
-          viewer_user_id: current_user.id,
-          target_user_id: target.id,
-        )
-      end
-
-      ::MessagingPreferences::EventRecorder.record_acknowledgement!(
-        viewer: current_user,
-        target: target,
-        digest: snapshot.digest,
-        already_current: already_current,
-      )
+      return render_error(error_key, error_status) if error_key.present?
 
       render json: {
         success: true,
@@ -147,15 +182,15 @@ module ::MessagingPreferences
         )
     end
 
-    def persist_field!(field_name, value)
-      fields = ::UserCustomField.where(user_id: current_user.id, name: field_name).order(:id)
+    def persist_field!(user_id, field_name, value)
+      fields = ::UserCustomField.where(user_id: user_id, name: field_name).order(:id)
 
       if value.blank?
         fields.delete_all
         return
       end
 
-      field = fields.first || ::UserCustomField.new(user_id: current_user.id, name: field_name)
+      field = fields.first || ::UserCustomField.new(user_id: user_id, name: field_name)
       field.value = value
       field.save!
 

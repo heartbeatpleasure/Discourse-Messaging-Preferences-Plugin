@@ -23,6 +23,18 @@ module ::MessagingPreferences
       )
     end
 
+    def self.record_admin_preference_clear!(actor:, target:, before_snapshot:)
+      return false if !before_snapshot.present?
+      return false if !::MessagingPreferences::Event.table_ready?
+
+      create_event(
+        event_type: "preferences_admin_cleared",
+        actor_user_id: actor.id,
+        target_user_id: target.id,
+        preferences_digest: nil,
+      )
+    end
+
     def self.record_acknowledgement!(viewer:, target:, digest:, already_current:)
       return false if already_current
       return false if !::MessagingPreferences::Event.table_ready?

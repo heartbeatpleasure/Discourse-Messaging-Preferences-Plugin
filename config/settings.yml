@@ -16,3 +16,8 @@ plugins:
     client: true
   messaging_preferences_staff_bypass_acknowledgement:
     default: true
+
+  messaging_preferences_activity_retention_days:
+    default: 365
+    min: 0
+    max: 36500

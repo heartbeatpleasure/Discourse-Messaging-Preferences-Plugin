@@ -1,7 +1,9 @@
 import Controller from "@ember/controller";
 import { action } from "@ember/object";
+import { service } from "@ember/service";
 import { tracked } from "@glimmer/tracking";
 import { ajax } from "discourse/lib/ajax";
+import { popupAjaxError } from "discourse/lib/ajax-error";
 import getURL from "discourse/lib/get-url";
 import userSearch from "discourse/lib/user-search";
 import { i18n } from "discourse-i18n";
@@ -57,12 +59,16 @@ function decorateSearchUser(user) {
 }
 
 export default class AdminPluginsMessagingPreferencesActivityController extends Controller {
+  @service dialog;
+  @service toasts;
+
   @tracked data;
   @tracked isLoading = false;
   @tracked error;
   @tracked query = "";
   @tracked searchResults = [];
   @tracked isSearching = false;
+  @tracked isMaintaining = false;
   @tracked searchActiveIndex = -1;
 
   searchSequence = 0;
@@ -73,6 +79,79 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
 
   get summary() {
     return this.data?.summary || {};
+  }
+
+  get maintenance() {
+    return this.data?.maintenance || {};
+  }
+
+  get selectedMaintenance() {
+    return this.maintenance.selected_user || {};
+  }
+
+  get retentionLabel() {
+    if (this.maintenance.retention_unlimited) {
+      return i18n(
+        "admin.messaging_preferences.activity.maintenance.retention_unlimited"
+      );
+    }
+
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.retention_days",
+      { days: formatNumber(this.maintenance.retention_days) }
+    );
+  }
+
+  get retainedEventsLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.retained_events",
+      { count: formatNumber(this.maintenance.event_records) }
+    );
+  }
+
+  get expiredEventsLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.expired_events",
+      { count: formatNumber(this.maintenance.expired_event_records) }
+    );
+  }
+
+  get integrityLabel() {
+    const orphanCount =
+      Number(this.maintenance.orphaned_acknowledgement_records || 0) +
+      Number(this.maintenance.orphaned_event_records || 0);
+
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.integrity_detail",
+      {
+        duplicates: formatNumber(
+          this.maintenance.duplicate_custom_field_records
+        ),
+        blank: formatNumber(this.maintenance.blank_custom_field_records),
+        invalidAcks: formatNumber(
+          this.maintenance.invalid_acknowledgement_records
+        ),
+        orphans: formatNumber(orphanCount),
+      }
+    );
+  }
+
+  get selectedMemberAcknowledgementsLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.member_acknowledgements",
+      {
+        count: formatNumber(
+          this.selectedMaintenance.acknowledgement_records
+        ),
+      }
+    );
+  }
+
+  get selectedMemberPreferencesLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.member_preferences",
+      { count: formatNumber(this.selectedMaintenance.preference_fields) }
+    );
   }
 
   get summaryCards() {
@@ -330,6 +409,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.query = "";
     this.searchResults = [];
     this.isSearching = false;
+    this.isMaintaining = false;
     this.searchActiveIndex = -1;
     this.searchSequence += 1;
   }
@@ -483,5 +563,176 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.searchActiveIndex = -1;
     this.isSearching = false;
     return this.loadActivity();
+  }
+
+  async performAdminAction(path, type, successMessage) {
+    this.isMaintaining = true;
+
+    try {
+      const result = await ajax(getURL(path), { type });
+      const message =
+        typeof successMessage === "function"
+          ? successMessage(result)
+          : successMessage;
+
+      if (message) {
+        this.toasts.success({ data: { message } });
+      }
+
+      await this.loadActivity(this.selectedUser?.user?.id);
+      return result;
+    } catch (error) {
+      popupAjaxError(error);
+      this.error = i18n(
+        "admin.messaging_preferences.activity.action_failed"
+      );
+      return null;
+    } finally {
+      this.isMaintaining = false;
+    }
+  }
+
+  @action
+  runCleanup() {
+    this.dialog.confirm({
+      message: i18n(
+        "admin.messaging_preferences.activity.maintenance.run_cleanup_confirm"
+      ),
+      confirmButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.run_cleanup",
+      didConfirm: () =>
+        this.performAdminAction(
+          "/admin/plugins/messaging-preferences/activity/maintenance",
+          "POST",
+          (result) => {
+            const removed = Object.values(result?.removed || {}).reduce(
+              (total, value) => total + Number(value || 0),
+              0
+            );
+            return i18n(
+              "admin.messaging_preferences.activity.maintenance.cleanup_complete",
+              { count: formatNumber(removed) }
+            );
+          }
+        ),
+    });
+  }
+
+  @action
+  resetAllAcknowledgements() {
+    const count = Number(this.maintenance.acknowledgement_records || 0);
+
+    this.dialog.confirm({
+      message: i18n(
+        "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements_confirm",
+        { count: formatNumber(count) }
+      ),
+      confirmButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements",
+      confirmButtonClass: "btn-danger",
+      didConfirm: () =>
+        this.performAdminAction(
+          "/admin/plugins/messaging-preferences/activity/acknowledgements",
+          "DELETE",
+          (result) =>
+            i18n(
+              "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements_complete",
+              {
+                count: formatNumber(result?.removed_acknowledgements),
+              }
+            )
+        ),
+    });
+  }
+
+  @action
+  clearActivityHistory() {
+    const count = Number(this.maintenance.event_records || 0);
+
+    this.dialog.confirm({
+      message: i18n(
+        "admin.messaging_preferences.activity.maintenance.clear_history_confirm",
+        { count: formatNumber(count) }
+      ),
+      confirmButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.clear_history",
+      confirmButtonClass: "btn-danger",
+      didConfirm: () =>
+        this.performAdminAction(
+          "/admin/plugins/messaging-preferences/activity/history",
+          "DELETE",
+          (result) =>
+            i18n(
+              "admin.messaging_preferences.activity.maintenance.clear_history_complete",
+              { count: formatNumber(result?.removed_events) }
+            )
+        ),
+    });
+  }
+
+  @action
+  resetSelectedMemberAcknowledgements() {
+    const user = this.selectedUser?.user;
+    if (!user) {
+      return;
+    }
+
+    const count = Number(this.selectedMaintenance.acknowledgement_records || 0);
+
+    this.dialog.confirm({
+      message: i18n(
+        "admin.messaging_preferences.activity.maintenance.reset_member_acknowledgements_confirm",
+        { username: user.username, count: formatNumber(count) }
+      ),
+      confirmButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.reset_member_acknowledgements",
+      confirmButtonClass: "btn-danger",
+      didConfirm: () =>
+        this.performAdminAction(
+          `/admin/plugins/messaging-preferences/activity/users/${user.id}/acknowledgements`,
+          "DELETE",
+          (result) =>
+            i18n(
+              "admin.messaging_preferences.activity.maintenance.reset_member_acknowledgements_complete",
+              {
+                username: user.username,
+                count: formatNumber(result?.removed_acknowledgements),
+              }
+            )
+        ),
+    });
+  }
+
+  @action
+  clearSelectedMemberPreferences() {
+    const user = this.selectedUser?.user;
+    if (!user) {
+      return;
+    }
+
+    this.dialog.confirm({
+      message: i18n(
+        "admin.messaging_preferences.activity.maintenance.clear_member_preferences_confirm",
+        {
+          username: user.username,
+          acknowledgements: formatNumber(
+            this.selectedMaintenance.received_acknowledgement_records
+          ),
+        }
+      ),
+      confirmButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.clear_member_preferences",
+      confirmButtonClass: "btn-danger",
+      didConfirm: () =>
+        this.performAdminAction(
+          `/admin/plugins/messaging-preferences/activity/users/${user.id}/preferences`,
+          "DELETE",
+          () =>
+            i18n(
+              "admin.messaging_preferences.activity.maintenance.clear_member_preferences_complete",
+              { username: user.username }
+            )
+        ),
+    });
   }
 }

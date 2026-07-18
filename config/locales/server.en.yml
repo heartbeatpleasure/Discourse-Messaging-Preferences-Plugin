@@ -6,6 +6,7 @@ en:
     messaging_preferences_require_acknowledgement: "Require members to acknowledge the current preferences before they can send. When disabled, preferences remain informational and do not block sending."
     messaging_preferences_show_reminder_after_acknowledgement: "Keep a compact View reminder visible after the current preferences have been acknowledged."
     messaging_preferences_staff_bypass_acknowledgement: "Allow staff to view Messaging Preferences without being required to acknowledge them before sending."
+    messaging_preferences_activity_retention_days: "Number of days to keep privacy-safe Messaging Preferences activity history. Use 0 to keep activity indefinitely."
 
   messaging_preferences:
     errors:

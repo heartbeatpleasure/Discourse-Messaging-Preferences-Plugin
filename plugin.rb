@@ -2,7 +2,7 @@
 
 # name: Discourse-Messaging-Preferences-Plugin
 # about: Lets members define private messaging preferences for personal messages and direct chats.
-# version: 0.5.0
+# version: 0.6.0
 # authors: Chris
 # url: https://github.com/xxxxxx/Discourse-Messaging-Preferences-Plugin
 
@@ -40,6 +40,9 @@ after_initialize do
   require_relative "lib/messaging_preferences/preference_snapshot"
   require_relative "lib/messaging_preferences/event_recorder"
   require_relative "lib/messaging_preferences/admin_activity"
+  require_relative "lib/messaging_preferences/data_maintenance"
+  require_relative "lib/messaging_preferences/user_archive_export"
+  require_relative "lib/messaging_preferences/user_archive_extension"
   require_relative "lib/messaging_preferences/user_lifecycle_cleanup"
   require_dependency File.expand_path(
     "app/controllers/messaging_preferences/preferences_controller.rb",
@@ -49,6 +52,8 @@ after_initialize do
     "app/controllers/messaging_preferences/admin_activity_controller.rb",
     __dir__,
   )
+
+  ::MessagingPreferences::UserArchiveExtension.install!
 
   ::MessagingPreferences::FIELD_NAMES.each do |field_name|
     register_editable_user_custom_field field_name
@@ -125,6 +130,26 @@ after_initialize do
           "messaging_preferences/admin_activity#index",
         defaults: { format: :json },
         constraints: AdminConstraint.new
+    delete "/admin/plugins/messaging-preferences/activity/users/:user_id/acknowledgements" =>
+             "messaging_preferences/admin_activity#reset_user_acknowledgements",
+           defaults: { format: :json },
+           constraints: AdminConstraint.new
+    delete "/admin/plugins/messaging-preferences/activity/users/:user_id/preferences" =>
+             "messaging_preferences/admin_activity#clear_user_preferences",
+           defaults: { format: :json },
+           constraints: AdminConstraint.new
+    delete "/admin/plugins/messaging-preferences/activity/acknowledgements" =>
+             "messaging_preferences/admin_activity#reset_all_acknowledgements",
+           defaults: { format: :json },
+           constraints: AdminConstraint.new
+    delete "/admin/plugins/messaging-preferences/activity/history" =>
+             "messaging_preferences/admin_activity#clear_activity_history",
+           defaults: { format: :json },
+           constraints: AdminConstraint.new
+    post "/admin/plugins/messaging-preferences/activity/maintenance" =>
+           "messaging_preferences/admin_activity#run_maintenance",
+         defaults: { format: :json },
+         constraints: AdminConstraint.new
 
     get "/messaging-preferences/v1/users/:username" =>
           "messaging_preferences/preferences#show",

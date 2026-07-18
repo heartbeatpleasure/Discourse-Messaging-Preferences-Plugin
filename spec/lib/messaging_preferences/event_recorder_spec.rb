@@ -69,4 +69,30 @@ RSpec.describe MessagingPreferences::EventRecorder do
 
     expect(MessagingPreferences::Event.where(event_type: "acknowledged").count).to eq(1)
   end
+  it "records an admin preference clear without storing preference text" do
+    admin = Fabricate(:admin)
+    UserCustomField.create!(
+      user_id: user.id,
+      name: MessagingPreferences::WORKS_WELL_FIELD,
+      value: "Private text",
+    )
+    before_snapshot = snapshot
+    before_snapshot.digest
+
+    expect(
+      described_class.record_admin_preference_clear!(
+        actor: admin,
+        target: user,
+        before_snapshot: before_snapshot,
+      ),
+    ).to eq(true)
+
+    event = MessagingPreferences::Event.last
+    expect(event.event_type).to eq("preferences_admin_cleared")
+    expect(event.actor_user_id).to eq(admin.id)
+    expect(event.target_user_id).to eq(user.id)
+    expect(event.preferences_digest).to be_nil
+    expect(event.attributes.values).not_to include("Private text")
+  end
+
 end
