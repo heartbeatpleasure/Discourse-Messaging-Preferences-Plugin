@@ -1,0 +1,11 @@
+en:
+  site_settings:
+    messaging_preferences_enabled: "Enable Messaging Preferences. Members can save private messaging preferences and the plugin exposes the secured API used by the frontend component."
+
+  messaging_preferences:
+    errors:
+      database_not_ready: "Messaging Preferences is still being prepared after an update. Please try again shortly."
+      no_preferences: "This member has not set any messaging preferences."
+      own_preferences: "You do not need to acknowledge your own messaging preferences."
+      stale_preferences: "These messaging preferences changed before they were acknowledged. Refresh them and try again."
+      too_long: "Each messaging preference must be %{maximum} characters or fewer."

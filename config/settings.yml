@@ -1,0 +1,4 @@
+plugins:
+  messaging_preferences_enabled:
+    default: true
+    client: true
