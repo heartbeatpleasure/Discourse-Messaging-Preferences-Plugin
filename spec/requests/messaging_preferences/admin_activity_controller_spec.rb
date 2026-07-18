@@ -34,6 +34,26 @@ RSpec.describe MessagingPreferences::AdminActivityController, type: :request do
     )
     expect(response.body).not_to include("Introduce yourself")
   end
+
+  it "applies period, event-type, and pagination parameters" do
+    sign_in(admin)
+    MessagingPreferences::Event.create!(
+      event_type: "preferences_updated",
+      actor: member,
+      target: member,
+      occurred_at: 10.days.ago,
+    )
+
+    get "/admin/plugins/messaging-preferences/activity.json",
+        params: { period: "7", event_filter: "preference_changes", page: 2 }
+
+    expect(response.status).to eq(200)
+    expect(response.parsed_body.dig("filters", "period")).to eq("7")
+    expect(response.parsed_body.dig("filters", "event_filter")).to eq(
+      "preference_changes",
+    )
+    expect(response.parsed_body.dig("recent_events", "pagination", "total")).to eq(0)
+  end
 end
 
 RSpec.describe "Messaging Preferences admin maintenance", type: :request do

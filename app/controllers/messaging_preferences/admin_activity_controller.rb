@@ -10,7 +10,13 @@ module ::MessagingPreferences
 
     def index
       render_json_dump(
-        ::MessagingPreferences::AdminActivity.payload(user_id: params[:user_id]),
+        ::MessagingPreferences::AdminActivity.payload(
+          user_id: params[:user_id],
+          period: params[:period],
+          event_filter: params[:event_filter],
+          page: params[:page],
+          user_page: params[:user_page],
+        ),
       )
     end
 

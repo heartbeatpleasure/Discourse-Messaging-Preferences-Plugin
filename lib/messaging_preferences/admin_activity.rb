@@ -2,25 +2,84 @@
 
 module ::MessagingPreferences
   class AdminActivity
-    RECENT_EVENT_LIMIT = 50
-    USER_EVENT_LIMIT = 100
+    PERIODS = {
+      "7" => 7,
+      "30" => 30,
+      "90" => 90,
+      "all" => nil,
+    }.freeze
+    EVENT_FILTERS = {
+      "all" => ::MessagingPreferences::Event::EVENT_TYPES,
+      "preference_changes" => ::MessagingPreferences::Event::PREFERENCE_EVENT_TYPES,
+      "acknowledgements" => [::MessagingPreferences::Event::ACKNOWLEDGEMENT_EVENT_TYPE],
+    }.freeze
+    DEFAULT_PERIOD = "30"
+    DEFAULT_EVENT_FILTER = "all"
+    EVENTS_PER_PAGE = 25
     RELATIONSHIP_LIMIT = 100
 
     class << self
-      def payload(user_id: nil)
+      def payload(
+        user_id: nil,
+        period: DEFAULT_PERIOD,
+        event_filter: DEFAULT_EVENT_FILTER,
+        page: 1,
+        user_page: 1
+      )
+        period = normalize_period(period)
+        event_filter = normalize_event_filter(event_filter)
+        page = normalize_page(page)
+        user_page = normalize_page(user_page)
         states = preference_states
         acknowledgements = acknowledgement_rows
+        filtered_scope = filtered_event_scope(period: period, event_filter: event_filter)
+        selected_user =
+          if user_id.present?
+            user_payload(
+              user_id,
+              states,
+              filtered_scope: filtered_scope,
+              page: user_page,
+            )
+          end
 
         {
           generated_at: Time.zone.now.iso8601(6),
+          filters: filter_payload(period: period, event_filter: event_filter),
           summary: summary(states, acknowledgements),
-          recent_events: recent_events,
-          selected_user: user_id.present? ? user_payload(user_id, states) : nil,
+          trend: trend_payload(period),
+          recent_events: paginated_events(filtered_scope, page),
+          selected_user: selected_user,
           maintenance: ::MessagingPreferences::DataMaintenance.status(user_id: user_id),
         }
       end
 
       private
+
+      def normalize_period(value)
+        value = value.to_s
+        PERIODS.key?(value) ? value : DEFAULT_PERIOD
+      end
+
+      def normalize_event_filter(value)
+        value = value.to_s
+        EVENT_FILTERS.key?(value) ? value : DEFAULT_EVENT_FILTER
+      end
+
+      def normalize_page(value)
+        [value.to_i, 1].max
+      end
+
+      def filter_payload(period:, event_filter:)
+        start_at = period_start(period)
+
+        {
+          period: period,
+          event_filter: event_filter,
+          starts_at: start_at&.iso8601(6),
+          ends_at: Time.zone.now.iso8601(6),
+        }
+      end
 
       def active_user_scope
         ::User.where(active: true, staged: false)
@@ -127,22 +186,146 @@ module ::MessagingPreferences
         ::MessagingPreferences::Event.group(:event_type).count
       end
 
-      def recent_events
-        return [] if !::MessagingPreferences::Event.table_ready?
+      def base_event_scope
+        return ::MessagingPreferences::Event.none if !::MessagingPreferences::Event.table_ready?
 
-        serialize_events(
-          ::MessagingPreferences::Event.order(occurred_at: :desc).limit(RECENT_EVENT_LIMIT),
-        )
+        ::MessagingPreferences::Event.all
       end
 
-      def user_payload(user_id, states)
+      def period_start(period)
+        days = PERIODS.fetch(period)
+        days.present? ? days.days.ago : nil
+      end
+
+      def filtered_event_scope(period:, event_filter:)
+        scope = base_event_scope.where(event_type: EVENT_FILTERS.fetch(event_filter))
+        start_at = period_start(period)
+        start_at.present? ? scope.where("occurred_at >= ?", start_at) : scope
+      end
+
+      def trend_payload(period)
+        current_scope = base_event_scope
+        days = PERIODS.fetch(period)
+        start_at = period_start(period)
+        previous = nil
+        previous_start = nil
+        previous_end = nil
+        current_scope = current_scope.where("occurred_at >= ?", start_at) if start_at.present?
+        current = trend_counts(current_scope)
+
+        if days.present?
+          previous_end = start_at
+          previous_start = previous_end - days.days
+          previous_scope =
+            base_event_scope.where(
+              "occurred_at >= ? AND occurred_at < ?",
+              previous_start,
+              previous_end,
+            )
+          previous = trend_counts(previous_scope)
+        end
+
+        {
+          period: period,
+          comparison_available: previous.present?,
+          starts_at: start_at&.iso8601(6),
+          ends_at: Time.zone.now.iso8601(6),
+          previous_starts_at: previous_start&.iso8601(6),
+          previous_ends_at: previous_end&.iso8601(6),
+          metrics: {
+            preference_changes:
+              trend_metric(current[:preference_changes], previous&.dig(:preference_changes)),
+            acknowledgements:
+              trend_metric(current[:acknowledgements], previous&.dig(:acknowledgements)),
+            active_members:
+              trend_metric(current[:active_members], previous&.dig(:active_members)),
+            total_events: trend_metric(current[:total_events], previous&.dig(:total_events)),
+          },
+        }
+      end
+
+      def trend_counts(scope)
+        event_counts = scope.group(:event_type).count
+
+        {
+          preference_changes:
+            ::MessagingPreferences::Event::PREFERENCE_EVENT_TYPES.sum do |type|
+              event_counts[type].to_i
+            end,
+          acknowledgements:
+            event_counts[::MessagingPreferences::Event::ACKNOWLEDGEMENT_EVENT_TYPE].to_i,
+          active_members: scope.distinct.count(:actor_user_id),
+          total_events: event_counts.values.sum,
+        }
+      end
+
+      def trend_metric(current, previous)
+        current = current.to_i
+        return { current: current, previous: nil, change_percent: nil, direction: "none" } if previous.nil?
+
+        previous = previous.to_i
+        direction =
+          if current > previous
+            "up"
+          elsif current < previous
+            "down"
+          else
+            "flat"
+          end
+
+        change_percent =
+          if previous.zero?
+            current.zero? ? 0 : nil
+          else
+            (((current - previous).to_f / previous) * 100).round
+          end
+
+        {
+          current: current,
+          previous: previous,
+          change_percent: change_percent,
+          direction: direction,
+        }
+      end
+
+      def paginated_events(scope, requested_page)
+        total = scope.count
+        total_pages = [(total.to_f / EVENTS_PER_PAGE).ceil, 1].max
+        page = [[requested_page, 1].max, total_pages].min
+        records =
+          scope
+            .order(occurred_at: :desc, id: :desc)
+            .offset((page - 1) * EVENTS_PER_PAGE)
+            .limit(EVENTS_PER_PAGE)
+
+        {
+          items: serialize_events(records),
+          pagination: {
+            page: page,
+            per_page: EVENTS_PER_PAGE,
+            total: total,
+            total_pages: total_pages,
+            has_previous: page > 1,
+            has_next: page < total_pages,
+          },
+        }
+      end
+
+      def user_payload(user_id, states, filtered_scope:, page:)
         user = active_user_scope.find_by(id: user_id.to_i)
         return if user.blank?
 
         state = states[user.id] || empty_state
         received = received_acknowledgements(user, states)
         made = made_acknowledgements(user, states)
-        events = user_events(user)
+        events =
+          paginated_events(
+            filtered_scope.where(
+              "actor_user_id = :id OR target_user_id = :id",
+              id: user.id,
+            ),
+            page,
+          )
 
         event_counts = user_event_counts(user)
         relationship_counts = current_relationship_counts(user, states)
@@ -223,7 +406,6 @@ module ::MessagingPreferences
         end
       end
 
-
       def current_relationship_counts(user, states)
         return {
           current_acknowledgements_received: 0,
@@ -280,17 +462,6 @@ module ::MessagingPreferences
               event_type: ::MessagingPreferences::Event::ACKNOWLEDGEMENT_EVENT_TYPE,
             ).count,
         }
-      end
-
-      def user_events(user)
-        return [] if !::MessagingPreferences::Event.table_ready?
-
-        serialize_events(
-          ::MessagingPreferences::Event
-            .where("actor_user_id = :id OR target_user_id = :id", id: user.id)
-            .order(occurred_at: :desc)
-            .limit(USER_EVENT_LIMIT),
-        )
       end
 
       def serialize_events(scope)

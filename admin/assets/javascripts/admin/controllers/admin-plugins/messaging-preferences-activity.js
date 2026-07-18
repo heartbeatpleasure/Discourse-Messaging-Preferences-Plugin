@@ -9,6 +9,8 @@ import userSearch from "discourse/lib/user-search";
 import { i18n } from "discourse-i18n";
 
 const SEARCH_LIMIT = 10;
+const DEFAULT_PERIOD = "30";
+const DEFAULT_EVENT_FILTER = "all";
 
 function formatNumber(value) {
   const number = Number(value || 0);
@@ -70,8 +72,13 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
   @tracked isSearching = false;
   @tracked isMaintaining = false;
   @tracked searchActiveIndex = -1;
+  @tracked period = DEFAULT_PERIOD;
+  @tracked eventFilter = DEFAULT_EVENT_FILTER;
+  @tracked eventPage = 1;
+  @tracked userEventPage = 1;
 
   searchSequence = 0;
+  loadSequence = 0;
 
   get hasData() {
     return Boolean(this.data?.summary);
@@ -81,12 +88,58 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     return this.data?.summary || {};
   }
 
+  get trend() {
+    return this.data?.trend || {};
+  }
+
   get maintenance() {
     return this.data?.maintenance || {};
   }
 
   get selectedMaintenance() {
     return this.maintenance.selected_user || {};
+  }
+
+  get periodOptions() {
+    return [
+      {
+        value: "7",
+        label: i18n("admin.messaging_preferences.activity.filters.period_7"),
+      },
+      {
+        value: "30",
+        label: i18n("admin.messaging_preferences.activity.filters.period_30"),
+      },
+      {
+        value: "90",
+        label: i18n("admin.messaging_preferences.activity.filters.period_90"),
+      },
+      {
+        value: "all",
+        label: i18n("admin.messaging_preferences.activity.filters.period_all"),
+      },
+    ];
+  }
+
+  get eventFilterOptions() {
+    return [
+      {
+        value: "all",
+        label: i18n("admin.messaging_preferences.activity.filters.type_all"),
+      },
+      {
+        value: "preference_changes",
+        label: i18n(
+          "admin.messaging_preferences.activity.filters.type_preference_changes"
+        ),
+      },
+      {
+        value: "acknowledgements",
+        label: i18n(
+          "admin.messaging_preferences.activity.filters.type_acknowledgements"
+        ),
+      },
+    ];
   }
 
   get retentionLabel() {
@@ -133,6 +186,20 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
         ),
         orphans: formatNumber(orphanCount),
       }
+    );
+  }
+
+  get allAcknowledgementsLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.acknowledgements_detail",
+      { count: formatNumber(this.maintenance.acknowledgement_records) }
+    );
+  }
+
+  get allHistoryLabel() {
+    return i18n(
+      "admin.messaging_preferences.activity.maintenance.history_detail",
+      { count: formatNumber(this.maintenance.event_records) }
     );
   }
 
@@ -231,24 +298,135 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     ];
   }
 
+  trendDetail(metric) {
+    if (!this.trend.comparison_available) {
+      return i18n(
+        "admin.messaging_preferences.activity.trends.no_comparison"
+      );
+    }
+
+    if (metric?.change_percent == null) {
+      return i18n(
+        "admin.messaging_preferences.activity.trends.new_activity",
+        { previous: formatNumber(metric?.previous) }
+      );
+    }
+
+    if (metric.direction === "flat") {
+      return i18n("admin.messaging_preferences.activity.trends.unchanged", {
+        previous: formatNumber(metric.previous),
+      });
+    }
+
+    return i18n(
+      metric.direction === "up"
+        ? "admin.messaging_preferences.activity.trends.increased"
+        : "admin.messaging_preferences.activity.trends.decreased",
+      {
+        previous: formatNumber(metric.previous),
+        percent: formatNumber(Math.abs(metric.change_percent)),
+      }
+    );
+  }
+
+  get trendCards() {
+    const metrics = this.trend.metrics || {};
+    return [
+      {
+        label: i18n(
+          "admin.messaging_preferences.activity.trends.preference_changes"
+        ),
+        value: formatNumber(metrics.preference_changes?.current),
+        detail: this.trendDetail(metrics.preference_changes),
+      },
+      {
+        label: i18n(
+          "admin.messaging_preferences.activity.trends.acknowledgements"
+        ),
+        value: formatNumber(metrics.acknowledgements?.current),
+        detail: this.trendDetail(metrics.acknowledgements),
+      },
+      {
+        label: i18n(
+          "admin.messaging_preferences.activity.trends.active_members"
+        ),
+        value: formatNumber(metrics.active_members?.current),
+        detail: this.trendDetail(metrics.active_members),
+      },
+      {
+        label: i18n("admin.messaging_preferences.activity.trends.total_events"),
+        value: formatNumber(metrics.total_events?.current),
+        detail: this.trendDetail(metrics.total_events),
+      },
+    ];
+  }
+
   get generatedAtLabel() {
     return formatDateTime(this.data?.generated_at);
   }
 
+  get recentEventsPayload() {
+    return this.data?.recent_events || {};
+  }
+
   get recentEvents() {
-    return (this.data?.recent_events || []).map((event) =>
+    return (this.recentEventsPayload.items || []).map((event) =>
       this.decorateEvent(event)
     );
+  }
+
+  get recentPagination() {
+    return this.recentEventsPayload.pagination || {};
+  }
+
+  get recentPaginationLabel() {
+    return i18n("admin.messaging_preferences.activity.pagination.status", {
+      page: formatNumber(this.recentPagination.page || 1),
+      pages: formatNumber(this.recentPagination.total_pages || 1),
+      total: formatNumber(this.recentPagination.total || 0),
+    });
+  }
+
+  get recentPreviousDisabled() {
+    return this.isLoading || !this.recentPagination.has_previous;
+  }
+
+  get recentNextDisabled() {
+    return this.isLoading || !this.recentPagination.has_next;
   }
 
   get selectedUser() {
     return this.data?.selected_user;
   }
 
+  get selectedUserEventsPayload() {
+    return this.selectedUser?.events || {};
+  }
+
   get selectedUserEvents() {
-    return (this.selectedUser?.events || []).map((event) =>
+    return (this.selectedUserEventsPayload.items || []).map((event) =>
       this.decorateEvent(event)
     );
+  }
+
+  get selectedUserPagination() {
+    return this.selectedUserEventsPayload.pagination || {};
+  }
+
+  get selectedUserPaginationLabel() {
+    return i18n("admin.messaging_preferences.activity.pagination.status", {
+      page: formatNumber(this.selectedUserPagination.page || 1),
+      pages: formatNumber(this.selectedUserPagination.total_pages || 1),
+      total: formatNumber(this.selectedUserPagination.total || 0),
+    });
+  }
+
+  get selectedUserPreviousDisabled() {
+    return this.isLoading || !this.selectedUserPagination.has_previous;
+  }
+
+  get selectedUserNextDisabled() {
+    return this.isLoading || !this.selectedUserPagination.has_next;
   }
 
   get selectedUserCards() {
@@ -411,33 +589,115 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.isSearching = false;
     this.isMaintaining = false;
     this.searchActiveIndex = -1;
+    this.period = DEFAULT_PERIOD;
+    this.eventFilter = DEFAULT_EVENT_FILTER;
+    this.eventPage = 1;
+    this.userEventPage = 1;
     this.searchSequence += 1;
+    this.loadSequence += 1;
   }
 
   @action
   async loadActivity(userId = null) {
+    const sequence = ++this.loadSequence;
     this.isLoading = true;
     this.error = null;
 
     try {
-      this.data = await ajax(
+      const data = await ajax(
         getURL("/admin/plugins/messaging-preferences/activity"),
         {
           cache: false,
-          data: userId ? { user_id: userId } : {},
+          data: {
+            ...(userId ? { user_id: userId } : {}),
+            period: this.period,
+            event_filter: this.eventFilter,
+            page: this.eventPage,
+            user_page: this.userEventPage,
+          },
         }
       );
+
+      if (sequence !== this.loadSequence) {
+        return;
+      }
+
+      this.data = data;
+      this.period = this.data?.filters?.period || this.period;
+      this.eventFilter =
+        this.data?.filters?.event_filter || this.eventFilter;
+      this.eventPage = this.recentPagination.page || 1;
+      this.userEventPage = this.selectedUserPagination.page || 1;
     } catch {
-      this.error = i18n(
-        "admin.messaging_preferences.activity.load_error"
-      );
+      if (sequence === this.loadSequence) {
+        this.error = i18n(
+          "admin.messaging_preferences.activity.load_error"
+        );
+      }
     } finally {
-      this.isLoading = false;
+      if (sequence === this.loadSequence) {
+        this.isLoading = false;
+      }
     }
   }
 
   @action
   refresh() {
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  changePeriod(value) {
+    this.period = value;
+    this.eventPage = 1;
+    this.userEventPage = 1;
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  changeEventFilter(value) {
+    this.eventFilter = value;
+    this.eventPage = 1;
+    this.userEventPage = 1;
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  previousEventPage() {
+    if (!this.recentPagination.has_previous) {
+      return;
+    }
+    this.eventPage = Math.max(1, Number(this.recentPagination.page || 1) - 1);
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  nextEventPage() {
+    if (!this.recentPagination.has_next) {
+      return;
+    }
+    this.eventPage = Number(this.recentPagination.page || 1) + 1;
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  previousUserEventPage() {
+    if (!this.selectedUserPagination.has_previous) {
+      return;
+    }
+    this.userEventPage = Math.max(
+      1,
+      Number(this.selectedUserPagination.page || 1) - 1
+    );
+    return this.loadActivity(this.selectedUser?.user?.id);
+  }
+
+  @action
+  nextUserEventPage() {
+    if (!this.selectedUserPagination.has_next) {
+      return;
+    }
+    this.userEventPage = Number(this.selectedUserPagination.page || 1) + 1;
     return this.loadActivity(this.selectedUser?.user?.id);
   }
 
@@ -552,6 +812,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.searchResults = [];
     this.searchActiveIndex = -1;
     this.isSearching = false;
+    this.userEventPage = 1;
     return this.loadActivity(user.id);
   }
 
@@ -562,6 +823,7 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     this.searchResults = [];
     this.searchActiveIndex = -1;
     this.isSearching = false;
+    this.userEventPage = 1;
     return this.loadActivity();
   }
 
@@ -592,11 +854,41 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     }
   }
 
+  sitewideDialog({ title, message, confirmButtonLabel, didConfirm }) {
+    this.dialog.confirm({
+      title,
+      message,
+      class: "messaging-preferences-sitewide-confirm",
+      confirmButtonLabel,
+      confirmButtonClass: "btn-danger",
+      cancelButtonLabel:
+        "admin.messaging_preferences.activity.maintenance.cancel_sitewide_action",
+      didConfirm,
+    });
+  }
+
   @action
   runCleanup() {
-    this.dialog.confirm({
+    this.sitewideDialog({
+      title: i18n(
+        "admin.messaging_preferences.activity.maintenance.run_cleanup_title"
+      ),
       message: i18n(
-        "admin.messaging_preferences.activity.maintenance.run_cleanup_confirm"
+        "admin.messaging_preferences.activity.maintenance.run_cleanup_confirm",
+        {
+          events: formatNumber(this.maintenance.expired_event_records),
+          duplicates: formatNumber(
+            this.maintenance.duplicate_custom_field_records
+          ),
+          blank: formatNumber(this.maintenance.blank_custom_field_records),
+          invalidAcks: formatNumber(
+            this.maintenance.invalid_acknowledgement_records
+          ),
+          orphans: formatNumber(
+            Number(this.maintenance.orphaned_acknowledgement_records || 0) +
+              Number(this.maintenance.orphaned_event_records || 0)
+          ),
+        }
       ),
       confirmButtonLabel:
         "admin.messaging_preferences.activity.maintenance.run_cleanup",
@@ -622,14 +914,16 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
   resetAllAcknowledgements() {
     const count = Number(this.maintenance.acknowledgement_records || 0);
 
-    this.dialog.confirm({
+    this.sitewideDialog({
+      title: i18n(
+        "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements_title"
+      ),
       message: i18n(
         "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements_confirm",
         { count: formatNumber(count) }
       ),
       confirmButtonLabel:
         "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements",
-      confirmButtonClass: "btn-danger",
       didConfirm: () =>
         this.performAdminAction(
           "/admin/plugins/messaging-preferences/activity/acknowledgements",
@@ -649,14 +943,16 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
   clearActivityHistory() {
     const count = Number(this.maintenance.event_records || 0);
 
-    this.dialog.confirm({
+    this.sitewideDialog({
+      title: i18n(
+        "admin.messaging_preferences.activity.maintenance.clear_history_title"
+      ),
       message: i18n(
         "admin.messaging_preferences.activity.maintenance.clear_history_confirm",
         { count: formatNumber(count) }
       ),
       confirmButtonLabel:
         "admin.messaging_preferences.activity.maintenance.clear_history",
-      confirmButtonClass: "btn-danger",
       didConfirm: () =>
         this.performAdminAction(
           "/admin/plugins/messaging-preferences/activity/history",
@@ -680,6 +976,10 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     const count = Number(this.selectedMaintenance.acknowledgement_records || 0);
 
     this.dialog.confirm({
+      title: i18n(
+        "admin.messaging_preferences.activity.maintenance.member_action_title",
+        { username: user.username }
+      ),
       message: i18n(
         "admin.messaging_preferences.activity.maintenance.reset_member_acknowledgements_confirm",
         { username: user.username, count: formatNumber(count) }
@@ -711,6 +1011,10 @@ export default class AdminPluginsMessagingPreferencesActivityController extends 
     }
 
     this.dialog.confirm({
+      title: i18n(
+        "admin.messaging_preferences.activity.maintenance.member_action_title",
+        { username: user.username }
+      ),
       message: i18n(
         "admin.messaging_preferences.activity.maintenance.clear_member_preferences_confirm",
         {

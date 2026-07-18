@@ -3,10 +3,13 @@ import { on } from "@ember/modifier";
 import RouteTemplate from "ember-route-template";
 import getURL from "discourse/lib/get-url";
 import { eq } from "discourse/truth-helpers";
+import DSelect from "discourse/ui-kit/d-select";
 import { i18n } from "discourse-i18n";
 import MessagingPreferencesUserLink from "../../components/messaging-preferences-user-link";
 
-const settingsUrl = getURL("/admin/site_settings/category/all_results?filter=messaging_preferences");
+const settingsUrl = getURL(
+  "/admin/site_settings/category/all_results?filter=messaging_preferences"
+);
 const overviewUrl = getURL("/admin/plugins/messaging-preferences");
 
 export default RouteTemplate(
@@ -31,15 +34,11 @@ export default RouteTemplate(
 
       .mp-activity__hero,
       .mp-activity__panel {
+        padding: 1.2rem 1.35rem;
         border: 1px solid var(--mp-border);
         border-radius: 18px;
         background: var(--mp-surface);
         box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
-      }
-
-      .mp-activity__hero,
-      .mp-activity__panel {
-        padding: 1.2rem 1.35rem;
       }
 
       .mp-activity__header,
@@ -64,11 +63,17 @@ export default RouteTemplate(
         color: var(--mp-muted);
       }
 
-      .mp-activity__actions {
+      .mp-activity__actions,
+      .mp-activity__pagination,
+      .mp-activity__maintenance-actions {
         display: flex;
         flex-wrap: wrap;
-        justify-content: flex-end;
+        align-items: center;
         gap: 0.5rem;
+      }
+
+      .mp-activity__actions {
+        justify-content: flex-end;
       }
 
       .mp-activity__summary-grid,
@@ -78,8 +83,16 @@ export default RouteTemplate(
         gap: 1rem;
       }
 
+      .mp-activity__trend-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
       .mp-activity__summary-card,
-      .mp-activity__user-card {
+      .mp-activity__user-card,
+      .mp-activity__trend-card {
         min-width: 0;
         padding: 0.9rem 1rem;
         border: 1px solid var(--mp-border);
@@ -95,9 +108,9 @@ export default RouteTemplate(
 
       .mp-activity__card-value {
         margin-top: 0.25rem;
+        overflow-wrap: anywhere;
         font-size: var(--font-up-2);
         font-weight: 700;
-        overflow-wrap: anywhere;
       }
 
       .mp-activity__card-detail {
@@ -107,7 +120,8 @@ export default RouteTemplate(
       }
 
       .mp-activity__notice,
-      .mp-activity__error {
+      .mp-activity__error,
+      .mp-activity__scope-warning {
         padding: 0.8rem 0.9rem;
         border-radius: 12px;
       }
@@ -122,6 +136,27 @@ export default RouteTemplate(
         border: 1px solid var(--danger-low-mid);
         background: var(--danger-low);
         color: var(--danger);
+      }
+
+      .mp-activity__filters {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(12rem, 18rem));
+        gap: 0.9rem;
+        margin-top: 1rem;
+      }
+
+      .mp-activity__filter {
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .mp-activity__filter label {
+        font-size: var(--font-down-1);
+        font-weight: 700;
+      }
+
+      .mp-activity__filter select {
+        width: 100%;
       }
 
       .mp-activity__search {
@@ -215,10 +250,13 @@ export default RouteTemplate(
         border: 0 !important;
       }
 
-      .mp-activity__search-empty {
-        margin-top: 0.5rem;
+      .mp-activity__search-empty,
+      .mp-activity__empty {
+        margin-top: 0.75rem;
+        color: var(--mp-muted);
       }
 
+      .mp-activity__user-header,
       .mp-activity__user-grid {
         margin-top: 1rem;
       }
@@ -232,10 +270,15 @@ export default RouteTemplate(
 
       .mp-activity__subpanel {
         min-width: 0;
+        margin-top: 1rem;
         padding: 1rem;
         border: 1px solid var(--mp-border);
         border-radius: 16px;
         background: var(--mp-surface-alt);
+      }
+
+      .mp-activity__columns .mp-activity__subpanel {
+        margin-top: 0;
       }
 
       .mp-activity__subpanel h3 {
@@ -244,7 +287,7 @@ export default RouteTemplate(
 
       .mp-activity__maintenance-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
         margin-top: 1rem;
       }
@@ -257,8 +300,49 @@ export default RouteTemplate(
         background: var(--mp-surface-alt);
       }
 
-      .mp-activity__maintenance-card h3 {
+      .mp-activity__maintenance-card.is-sitewide {
+        border-color: var(--highlight-medium);
+        background: var(--highlight-low);
+      }
+
+      .mp-activity__maintenance-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
         margin-bottom: 0.45rem;
+      }
+
+      .mp-activity__maintenance-heading h3 {
+        margin: 0;
+      }
+
+      .mp-activity__scope-badge {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        padding: 0.2rem 0.5rem;
+        border: 1px solid var(--highlight-medium);
+        border-radius: 999px;
+        background: var(--highlight-low);
+        color: var(--primary-high);
+        font-size: var(--font-down-2);
+        font-weight: 700;
+      }
+
+      .mp-activity__scope-badge.is-member {
+        border-color: var(--primary-low-mid);
+        background: var(--primary-very-low);
+        color: var(--primary-medium);
+      }
+
+      .mp-activity__scope-warning {
+        display: grid;
+        gap: 0.25rem;
+        margin-top: 1rem;
+        border: 1px solid var(--highlight-medium);
+        background: var(--highlight-low);
+        color: var(--primary-high);
       }
 
       .mp-activity__maintenance-copy {
@@ -268,18 +352,7 @@ export default RouteTemplate(
       }
 
       .mp-activity__maintenance-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
         margin-top: 0.9rem;
-      }
-
-      .mp-activity__member-maintenance {
-        margin-top: 1rem;
-      }
-
-      .mp-activity__member-maintenance .mp-activity__maintenance-actions {
-        margin-top: 0.75rem;
       }
 
       .mp-activity__table-wrap {
@@ -314,11 +387,6 @@ export default RouteTemplate(
       .mp-activity__user-link:hover,
       .mp-activity__user-link:focus-visible {
         text-decoration: underline;
-      }
-
-      .mp-activity__event-copy {
-        min-width: 0;
-        line-height: 1.45;
       }
 
       .mp-activity__status {
@@ -358,15 +426,66 @@ export default RouteTemplate(
         background: var(--mp-surface-alt);
       }
 
+      .mp-activity__event-copy {
+        min-width: 0;
+        line-height: 1.45;
+      }
+
       .mp-activity__event-time {
         color: var(--mp-muted);
         font-size: var(--font-down-1);
         white-space: nowrap;
       }
 
-      .mp-activity__empty {
-        margin-top: 0.75rem;
+      .mp-activity__pagination {
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 0.8rem;
+        border-top: 1px solid var(--mp-border);
+      }
+
+      .mp-activity__pagination-status {
         color: var(--mp-muted);
+        font-size: var(--font-down-1);
+      }
+
+      .dialog-container.messaging-preferences-sitewide-confirm .dialog-content {
+        border: 2px solid var(--danger-medium);
+        border-radius: 16px;
+      }
+
+      .dialog-container.messaging-preferences-sitewide-confirm .dialog-header {
+        background: var(--danger-low);
+      }
+
+      .dialog-container.messaging-preferences-sitewide-confirm .dialog-header h3 {
+        color: var(--danger);
+      }
+
+      .dialog-container.messaging-preferences-sitewide-confirm .dialog-body p {
+        margin: 0;
+      }
+
+      .mp-sitewide-warning {
+        display: grid;
+        gap: 0.65rem;
+        line-height: 1.45;
+      }
+
+      .mp-sitewide-warning__scope {
+        display: block;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid var(--danger-low-mid);
+        border-radius: 10px;
+        background: var(--danger-low);
+        color: var(--danger);
+        font-weight: 700;
+      }
+
+      @media (max-width: 900px) {
+        .mp-activity__trend-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
 
       @media (max-width: 800px) {
@@ -399,7 +518,9 @@ export default RouteTemplate(
         }
 
         .mp-activity__summary-grid,
-        .mp-activity__user-grid {
+        .mp-activity__user-grid,
+        .mp-activity__trend-grid,
+        .mp-activity__filters {
           grid-template-columns: 1fr;
         }
 
@@ -409,6 +530,15 @@ export default RouteTemplate(
 
         .mp-activity__event-time {
           white-space: normal;
+        }
+
+        .mp-activity__pagination {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .mp-activity__pagination .btn {
+          width: 100%;
         }
       }
     </style>
@@ -442,10 +572,7 @@ export default RouteTemplate(
                 (i18n "admin.messaging_preferences.activity.refresh")
               }}
             </button>
-            <a
-              class="btn"
-              href={{settingsUrl}}
-            >
+            <a class="btn" href={{settingsUrl}}>
               {{i18n "admin.messaging_preferences.open_settings"}}
             </a>
             <a class="btn" href={{overviewUrl}}>
@@ -474,6 +601,67 @@ export default RouteTemplate(
               <div class="mp-activity__card-detail">{{card.detail}}</div>
             </article>
           {{/each}}
+        </section>
+
+        <section class="mp-activity__panel">
+          <div class="mp-activity__panel-copy">
+            <h2>{{i18n "admin.messaging_preferences.activity.trends.title"}}</h2>
+            <p class="mp-activity__muted">
+              {{i18n "admin.messaging_preferences.activity.trends.description"}}
+            </p>
+          </div>
+
+          <div class="mp-activity__filters">
+            <div class="mp-activity__filter">
+              <label for="mp-activity-period">
+                {{i18n "admin.messaging_preferences.activity.filters.period_label"}}
+              </label>
+              <DSelect
+                id="mp-activity-period"
+                @value={{@controller.period}}
+                @includeNone={{false}}
+                @onChange={{@controller.changePeriod}}
+                disabled={{@controller.isLoading}}
+                as |select|
+              >
+                {{#each @controller.periodOptions as |option|}}
+                  <select.Option @value={{option.value}}>
+                    {{option.label}}
+                  </select.Option>
+                {{/each}}
+              </DSelect>
+            </div>
+
+            <div class="mp-activity__filter">
+              <label for="mp-activity-event-filter">
+                {{i18n "admin.messaging_preferences.activity.filters.type_label"}}
+              </label>
+              <DSelect
+                id="mp-activity-event-filter"
+                @value={{@controller.eventFilter}}
+                @includeNone={{false}}
+                @onChange={{@controller.changeEventFilter}}
+                disabled={{@controller.isLoading}}
+                as |select|
+              >
+                {{#each @controller.eventFilterOptions as |option|}}
+                  <select.Option @value={{option.value}}>
+                    {{option.label}}
+                  </select.Option>
+                {{/each}}
+              </DSelect>
+            </div>
+          </div>
+
+          <div class="mp-activity__trend-grid">
+            {{#each @controller.trendCards as |card|}}
+              <article class="mp-activity__trend-card">
+                <div class="mp-activity__card-label">{{card.label}}</div>
+                <div class="mp-activity__card-value">{{card.value}}</div>
+                <div class="mp-activity__card-detail">{{card.detail}}</div>
+              </article>
+            {{/each}}
+          </div>
         </section>
 
         <section class="mp-activity__panel">
@@ -579,9 +767,7 @@ export default RouteTemplate(
             <div class="mp-activity__user-header">
               <div class="mp-activity__user-copy">
                 <h2>
-                  <MessagingPreferencesUserLink
-                    @user={{@controller.selectedUser.user}}
-                  >
+                  <MessagingPreferencesUserLink @user={{@controller.selectedUser.user}}>
                     {{@controller.selectedUser.user.username}}
                   </MessagingPreferencesUserLink>
                 </h2>
@@ -603,8 +789,13 @@ export default RouteTemplate(
               {{/each}}
             </div>
 
-            <section class="mp-activity__subpanel mp-activity__member-maintenance">
-              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.member_title"}}</h3>
+            <section class="mp-activity__subpanel">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.member_title"}}</h3>
+                <span class="mp-activity__scope-badge is-member">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.member_scope"}}
+                </span>
+              </div>
               <p class="mp-activity__muted">
                 {{i18n
                   "admin.messaging_preferences.activity.maintenance.member_description"
@@ -641,11 +832,7 @@ export default RouteTemplate(
 
             <div class="mp-activity__columns">
               <section class="mp-activity__subpanel">
-                <h3>
-                  {{i18n
-                    "admin.messaging_preferences.activity.user.received_title"
-                  }}
-                </h3>
+                <h3>{{i18n "admin.messaging_preferences.activity.user.received_title"}}</h3>
                 {{#if @controller.acknowledgementsReceived.length}}
                   <div class="mp-activity__table-wrap">
                     <table class="mp-activity__table">
@@ -683,11 +870,7 @@ export default RouteTemplate(
               </section>
 
               <section class="mp-activity__subpanel">
-                <h3>
-                  {{i18n
-                    "admin.messaging_preferences.activity.user.made_title"
-                  }}
-                </h3>
+                <h3>{{i18n "admin.messaging_preferences.activity.user.made_title"}}</h3>
                 {{#if @controller.acknowledgementsMade.length}}
                   <div class="mp-activity__table-wrap">
                     <table class="mp-activity__table">
@@ -727,6 +910,9 @@ export default RouteTemplate(
 
             <section class="mp-activity__subpanel">
               <h3>{{i18n "admin.messaging_preferences.activity.user.history_title"}}</h3>
+              <p class="mp-activity__muted">
+                {{i18n "admin.messaging_preferences.activity.user.history_filtered"}}
+              </p>
               {{#if @controller.selectedUserEvents.length}}
                 <div class="mp-activity__events">
                   {{#each @controller.selectedUserEvents as |event|}}
@@ -747,21 +933,13 @@ export default RouteTemplate(
                             {{event.actorDisplay}}
                           </MessagingPreferencesUserLink>
                           {{#if (eq event.event_type "preferences_created")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_created_action"
-                            }}
+                            {{i18n "admin.messaging_preferences.activity.events.preferences_created_action"}}
                           {{else if (eq event.event_type "preferences_updated")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_updated_action"
-                            }}
+                            {{i18n "admin.messaging_preferences.activity.events.preferences_updated_action"}}
                           {{else if (eq event.event_type "preferences_cleared")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_cleared_action"
-                            }}
+                            {{i18n "admin.messaging_preferences.activity.events.preferences_cleared_action"}}
                           {{else if (eq event.event_type "preferences_admin_cleared")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"
-                            }}
+                            {{i18n "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"}}
                             <MessagingPreferencesUserLink @user={{event.target}}>
                               {{event.targetDisplay}}
                             </MessagingPreferencesUserLink>{{i18n
@@ -779,6 +957,28 @@ export default RouteTemplate(
                   {{i18n "admin.messaging_preferences.activity.no_tracked_events"}}
                 </p>
               {{/if}}
+
+              <div class="mp-activity__pagination">
+                <button
+                  type="button"
+                  class="btn"
+                  disabled={{@controller.selectedUserPreviousDisabled}}
+                  {{on "click" @controller.previousUserEventPage}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.pagination.previous"}}
+                </button>
+                <span class="mp-activity__pagination-status">
+                  {{@controller.selectedUserPaginationLabel}}
+                </span>
+                <button
+                  type="button"
+                  class="btn"
+                  disabled={{@controller.selectedUserNextDisabled}}
+                  {{on "click" @controller.nextUserEventPage}}
+                >
+                  {{i18n "admin.messaging_preferences.activity.pagination.next"}}
+                </button>
+              </div>
             </section>
           {{/if}}
         </section>
@@ -791,13 +991,27 @@ export default RouteTemplate(
             </p>
           </div>
 
+          <div class="mp-activity__scope-warning">
+            <strong>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning_title"}}</strong>
+            <span>{{i18n "admin.messaging_preferences.activity.maintenance.sitewide_warning"}}</span>
+          </div>
+
           <div class="mp-activity__maintenance-grid">
-            <article class="mp-activity__maintenance-card">
-              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.retention_title"}}</h3>
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.integrity_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
+              </div>
+              <p class="mp-activity__muted">
+                {{i18n "admin.messaging_preferences.activity.maintenance.integrity_scope_detail"}}
+              </p>
               <div class="mp-activity__maintenance-copy">
                 <span>{{@controller.retentionLabel}}</span>
                 <span>{{@controller.retainedEventsLabel}}</span>
                 <span>{{@controller.expiredEventsLabel}}</span>
+                <span>{{@controller.integrityLabel}}</span>
               </div>
               <div class="mp-activity__maintenance-actions">
                 <button
@@ -811,11 +1025,16 @@ export default RouteTemplate(
               </div>
             </article>
 
-            <article class="mp-activity__maintenance-card">
-              <h3>{{i18n "admin.messaging_preferences.activity.maintenance.integrity_title"}}</h3>
-              <div class="mp-activity__maintenance-copy">
-                <span>{{@controller.integrityLabel}}</span>
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.acknowledgements_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
               </div>
+              <p class="mp-activity__muted">
+                {{@controller.allAcknowledgementsLabel}}
+              </p>
               <div class="mp-activity__maintenance-actions">
                 <button
                   type="button"
@@ -823,10 +1042,22 @@ export default RouteTemplate(
                   disabled={{@controller.isMaintaining}}
                   {{on "click" @controller.resetAllAcknowledgements}}
                 >
-                  {{i18n
-                    "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements"
-                  }}
+                  {{i18n "admin.messaging_preferences.activity.maintenance.reset_all_acknowledgements"}}
                 </button>
+              </div>
+            </article>
+
+            <article class="mp-activity__maintenance-card is-sitewide">
+              <div class="mp-activity__maintenance-heading">
+                <h3>{{i18n "admin.messaging_preferences.activity.maintenance.history_title"}}</h3>
+                <span class="mp-activity__scope-badge">
+                  {{i18n "admin.messaging_preferences.activity.maintenance.all_members_scope"}}
+                </span>
+              </div>
+              <p class="mp-activity__muted">
+                {{@controller.allHistoryLabel}}
+              </p>
+              <div class="mp-activity__maintenance-actions">
                 <button
                   type="button"
                   class="btn btn-danger"
@@ -853,43 +1084,35 @@ export default RouteTemplate(
               {{#each @controller.recentEvents as |event|}}
                 <article class="mp-activity__event">
                   <div class="mp-activity__event-copy">
-                        {{#if (eq event.event_type "acknowledged")}}
-                          <MessagingPreferencesUserLink @user={{event.actor}}>
-                            {{event.actorDisplay}}
-                          </MessagingPreferencesUserLink>
-                          {{i18n "admin.messaging_preferences.activity.events.acknowledged_action"}}
-                          <MessagingPreferencesUserLink @user={{event.target}}>
-                            {{event.targetDisplay}}
-                          </MessagingPreferencesUserLink>{{i18n
-                            "admin.messaging_preferences.activity.events.acknowledged_suffix"
-                          }}
-                        {{else}}
-                          <MessagingPreferencesUserLink @user={{event.actor}}>
-                            {{event.actorDisplay}}
-                          </MessagingPreferencesUserLink>
-                          {{#if (eq event.event_type "preferences_created")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_created_action"
-                            }}
-                          {{else if (eq event.event_type "preferences_updated")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_updated_action"
-                            }}
-                          {{else if (eq event.event_type "preferences_cleared")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_cleared_action"
-                            }}
-                          {{else if (eq event.event_type "preferences_admin_cleared")}}
-                            {{i18n
-                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"
-                            }}
-                            <MessagingPreferencesUserLink @user={{event.target}}>
-                              {{event.targetDisplay}}
-                            </MessagingPreferencesUserLink>{{i18n
-                              "admin.messaging_preferences.activity.events.preferences_admin_cleared_suffix"
-                            }}
-                          {{/if}}
-                        {{/if}}
+                    {{#if (eq event.event_type "acknowledged")}}
+                      <MessagingPreferencesUserLink @user={{event.actor}}>
+                        {{event.actorDisplay}}
+                      </MessagingPreferencesUserLink>
+                      {{i18n "admin.messaging_preferences.activity.events.acknowledged_action"}}
+                      <MessagingPreferencesUserLink @user={{event.target}}>
+                        {{event.targetDisplay}}
+                      </MessagingPreferencesUserLink>{{i18n
+                        "admin.messaging_preferences.activity.events.acknowledged_suffix"
+                      }}
+                    {{else}}
+                      <MessagingPreferencesUserLink @user={{event.actor}}>
+                        {{event.actorDisplay}}
+                      </MessagingPreferencesUserLink>
+                      {{#if (eq event.event_type "preferences_created")}}
+                        {{i18n "admin.messaging_preferences.activity.events.preferences_created_action"}}
+                      {{else if (eq event.event_type "preferences_updated")}}
+                        {{i18n "admin.messaging_preferences.activity.events.preferences_updated_action"}}
+                      {{else if (eq event.event_type "preferences_cleared")}}
+                        {{i18n "admin.messaging_preferences.activity.events.preferences_cleared_action"}}
+                      {{else if (eq event.event_type "preferences_admin_cleared")}}
+                        {{i18n "admin.messaging_preferences.activity.events.preferences_admin_cleared_action"}}
+                        <MessagingPreferencesUserLink @user={{event.target}}>
+                          {{event.targetDisplay}}
+                        </MessagingPreferencesUserLink>{{i18n
+                          "admin.messaging_preferences.activity.events.preferences_admin_cleared_suffix"
+                        }}
+                      {{/if}}
+                    {{/if}}
                   </div>
                   <time class="mp-activity__event-time">{{event.dateLabel}}</time>
                 </article>
@@ -900,6 +1123,28 @@ export default RouteTemplate(
               {{i18n "admin.messaging_preferences.activity.no_tracked_events"}}
             </p>
           {{/if}}
+
+          <div class="mp-activity__pagination">
+            <button
+              type="button"
+              class="btn"
+              disabled={{@controller.recentPreviousDisabled}}
+              {{on "click" @controller.previousEventPage}}
+            >
+              {{i18n "admin.messaging_preferences.activity.pagination.previous"}}
+            </button>
+            <span class="mp-activity__pagination-status">
+              {{@controller.recentPaginationLabel}}
+            </span>
+            <button
+              type="button"
+              class="btn"
+              disabled={{@controller.recentNextDisabled}}
+              {{on "click" @controller.nextEventPage}}
+            >
+              {{i18n "admin.messaging_preferences.activity.pagination.next"}}
+            </button>
+          </div>
         </section>
       {{/if}}
     </div>
